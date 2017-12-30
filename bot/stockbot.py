@@ -121,11 +121,11 @@ def getcalls(update,symbol=None):
         callstxt+=row[4]+" : "+row[0]+" "+row[1]+"@"+row[2]+" on <i>"+row[7].strftime('%b %d %H:%M')+ "</i>\n"
 
     if callstxt:
-        callstxt="Calls Made:\n=================================\n"+callstxt
+        callstxt="Calls Made:\n=============================\n"+callstxt
     else:
         callstxt="No calls\n"
 
-    callstxt+="=================================\n"
+    callstxt+="=============================\n"
 
     c.close()
     return callstxt
