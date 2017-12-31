@@ -70,12 +70,13 @@ c.close()
 # update. Error handlers also receive the raised TelegramError object in error.
 def start(bot, update):
     """Send a message when the command /start is issued."""
-    update.message.reply_text('Hi!')
+    update.message.reply_text('WolfTheStockBot v0.0.1\n\nHi guys! Happy New Year!!!!\n'\
+                              +'Checkout the / commands to get started or contact thiyaga')
 
 
 def help(bot, update):
     """Send a message when the command /help is issued."""
-    update.message.reply_text('Help!')
+    update.message.reply_text('contact thiyaga')
 
 
 def echo(bot, update):
@@ -84,7 +85,7 @@ def echo(bot, update):
 
 
 def quote(bot, update):
-   # try:
+    try:
         print(update.message.text)
         text = update.message.text
         if text.startswith("/quote"):
@@ -97,9 +98,10 @@ def quote(bot, update):
                 return SYMBOL
         else:
             return replyquote(text.upper(), update)
-    # except:
-    #     update.message.reply_text("Error!")
-    #     return ConversationHandler.END
+    except:
+        logger.warning('quote error "%s"', error)
+        update.message.reply_text("Invalid symbol or unknown error!")
+        return ConversationHandler.END
 
 
 def replyquote(symbol,update,chat_id=None,message_id=None,bot=None):
@@ -148,7 +150,7 @@ def getcalls(chat_id,symbol=None):
     else:
         callstxt="No calls\n"
 
-    callstxt+="=============================\n"
+    callstxt+="=============================\nmake a /call"
 
     c.close()
     return callstxt
@@ -322,7 +324,7 @@ def main():
 
     # Add conversation handler with the states GENDER, PHOTO, LOCATION and BIO
     conv_handler = ConversationHandler(
-        entry_points=[CommandHandler('quote', quote),CommandHandler('call', call),CommandHandler('calls', calls),
+        entry_points=[CommandHandler('start', start),CommandHandler('quote', quote),CommandHandler('call', call),CommandHandler('calls', calls),
                       CommandHandler('done', done)],
 
         states={
