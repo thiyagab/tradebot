@@ -90,23 +90,33 @@ def quote(bot, update):
         return ConversationHandler.END
 
 
-def replyquote(symbol,update):
-    message=getcalls(update,symbol)
-    message+=fetchquote(symbol)
+def replyquote(symbol,update,chat_id=None,message_id=None,bot=None):
+    #when called from refresh action, update object wont have chatid
+    if update.message:
+        chat_id=update.message.chat_id
+
+    message = fetchquote(symbol)
+    message+=getcalls(chat_id,symbol)
+
     symbolandexpiry = symbol.partition(' ')
     url = equityurl+symbol
     if symbolandexpiry[2]:
         url=futureurl % (symbolandexpiry[2],symbolandexpiry[0])
-    keyboard = [[InlineKeyboardButton("More", url=url)],
+    keyboard = [[InlineKeyboardButton("Refresh", callback_data='3'+symbol),InlineKeyboardButton("More", url=url)],
         [InlineKeyboardButton("Buy", callback_data='1'+symbol),
                  InlineKeyboardButton("Sell", callback_data='2'+symbol)]]
 
     reply_markup = InlineKeyboardMarkup(keyboard)
-    update.message.reply_text(text=message, parse_mode=ParseMode.HTML,reply_markup=reply_markup)
+    if bot:
+        bot.edit_message_text(text=message,
+                              chat_id=chat_id,
+                              message_id=message_id,parse_mode=ParseMode.HTML,reply_markup=reply_markup)
+    else:
+        update.message.reply_text(text=message, parse_mode=ParseMode.HTML,reply_markup=reply_markup)
     return ConversationHandler.END
 
-def getcalls(update,symbol=None):
-    chat_id=update.message.chat_id
+def getcalls(chat_id,symbol=None):
+
     conn = sqlite3.connect(dbname,detect_types=sqlite3.PARSE_DECLTYPES)
     c = conn.cursor()
     sqlstr="SELECT * FROM calls where chatid='"+str(chat_id)+"'"
@@ -134,16 +144,17 @@ def getcalls(update,symbol=None):
 def button(bot, update):
     query = update.callback_query
     print(query.data)
+    # Refresh and edit the same message
     if query.data.startswith('3'):
-        url=+query.data[1:]
-        webbrowser.open(url)
+        symbol=query.data[1:]
+        replyquote(symbol,update,chat_id=query.message.chat_id,message_id=query.message.message_id,bot=bot)
     else:
         query.message.reply_text("Not implemented yet")
 
 def calls(bot, update):
      # try:
         print(update.message.text)
-        update.message.reply_text(getcalls(update),parse_mode=ParseMode.HTML)
+        update.message.reply_text(getcalls(update.message.chat_id),parse_mode=ParseMode.HTML)
         return ConversationHandler.END
      # except:
      #     update.message.reply_text("Error")
@@ -166,15 +177,12 @@ def fetchquote(symbol):
         highkey='highPrice'
         lowkey='lowPrice'
         pclosekey='prevClose'
-
-
-
     #changedir=':arrow_down:' if pChange.startswith('-') else ':arrow_up:'
-    return '<b>'+symbol+'</b> @ <b>'+quote['lastPrice']+'</b> ( '+pchange+'% )\n'  \
-            'open: '+quote[openkey]+'\n' \
-            'high: '+quote[highkey]+'\n' \
-            'low: '+quote[lowkey]+'\n' \
-            'pClose: '+quote[pclosekey]
+    return '<b>'+symbol+'@'+quote['lastPrice']+'</b> ( '+pchange+'% )\n'  \
+            'o: '+quote[openkey]+ \
+            '\th: '+quote[highkey]+'\n' \
+            'l: '+quote[lowkey]+ \
+            '\tc: '+quote[pclosekey]+'\n\n'
 
 
 def error(bot, update, error):
@@ -188,20 +196,34 @@ def done(bot, update, user_data):
     return ConversationHandler.END
 
 def call(bot, update):
-    update.message.reply_text("Make a call in this format\nBUY|SELL <symbol>@<pricerange> SL@<pricerange>\ne.g BUY INFY@1000-1005 SL@995")
+    update.message.reply_text(SYNTAX,parse_mode=ParseMode.HTML)
     return MAKECALL
 
-def makecall(bot,update,user_data):
-    try:
-        text=update.message.text.upper()
 
+INVALIDSYNTAX,INVALIDSYMBOL,GENERALERROR = range(3)
+
+SYNTAX="Make a call in this format\nBUY|SELL 'symbol'@'pricerange' SL@'pricerange'\ne.g BUY INFY@1000-1005 SL@995"
+
+errormsgs={INVALIDSYNTAX:"syntax oyunga kudra Try again\n",INVALIDSYMBOL:"Symbol thappu. Try again",GENERALERROR:"Unknown Error!"}
+
+def makecall(bot,update,user_data):
+    # try:
+        text=update.message.text.upper()
         tarr=text.split(' ')
+        if len(text) >50 or len(tarr)<2 or '@' not in text:
+            errorreplytocall(update,INVALIDSYNTAX)
+            return MAKECALL
         type=tarr[0]
         symbol =tarr[1].split('@')[0]
         callrange = tarr[1].split('@')[1]
         slrange=''
 
-        quote=fetchquote(symbol)
+        quote=''
+        try:
+            quote=fetchquote(symbol)
+        except:
+            errorreplytocall(update,INVALIDSYMBOL)
+            return MAKECALL
 
         if len(tarr) >2:
             slrange=tarr[2].split('@')[1]
@@ -227,12 +249,19 @@ def makecall(bot,update,user_data):
         update.message.reply_text(text="Call made\n"+quote,parse_mode=ParseMode.HTML)
         deleteoldcalls()
 
-    except:
-        print("Unexpected error:", sys.exc_info()[0])
-        message = "Hi "+update.message.from_user.first_name+",\n"+"Please try again with proper syntax or symbol from NSE\ne.g. BUY INFY@1010 SL@1005"
-        update.message.reply_text(text=message, parse_mode=ParseMode.HTML)
+    # except:
+    #     print("Unexpected error:", sys.exc_info()[0])
+    #     errorreplytocall(update,GENERALERROR)
 
-    return ConversationHandler.END
+        return ConversationHandler.END
+
+def errorreplytocall(update,errortype):
+    message = "Hi " + getusername(
+        update.message.from_user.first_name) + ",\n" + errormsgs[errortype]
+    update.message.reply_text(text=message, parse_mode=ParseMode.HTML)
+
+def getusername(name):
+    return name
 
 def deleteoldcalls():
     conn = sqlite3.connect(dbname)
