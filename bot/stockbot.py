@@ -44,6 +44,18 @@ dbname='calls.db'
 equityurl='https://www.nseindia.com/live_market/dynaContent/live_watch/get_quote/GetQuote.jsp?symbol='
 futureurl='https://www.nseindia.com/live_market/dynaContent/live_watch/get_quote/GetQuoteFO.jsp?instrument=FUTSTK&expiry=%s&underlying=%s'
 
+INVALIDSYNTAX,INVALIDSYMBOL,GENERALERROR = range(3)
+
+SYNTAX="Make a call in this format\n" \
+       "BUY|SELL 'symbol'@'pricerange' SL@'pricerange'\n" \
+       "e.g BUY INFY@1000-1005 SL@995\n"\
+        "For futures:\n"\
+        "e.g BUY CGPOWER.JAN@92\n"
+
+errormsgs={INVALIDSYNTAX:"syntax oyunga kudra\n",INVALIDSYMBOL:"Symbol thappu.",GENERALERROR:"Unknown Error!"}
+
+FUTURES=('25JAN2018','22FEB2018','28MAR2018')
+
 conn = sqlite3.connect(dbname)
 c=conn.cursor()
 # Create table
@@ -72,7 +84,7 @@ def echo(bot, update):
 
 
 def quote(bot, update):
-    try:
+   # try:
         print(update.message.text)
         text = update.message.text
         if text.startswith("/quote"):
@@ -81,13 +93,13 @@ def quote(bot, update):
                 symbol = parttext[2].upper()
                 return replyquote(symbol,update)
             else:
-                update.message.reply_text('symbol?')
+                update.message.reply_text('nse symbol?\n(for futures, <symbol> <month>')
                 return SYMBOL
         else:
             return replyquote(text.upper(), update)
-    except:
-        update.message.reply_text("Error!")
-        return ConversationHandler.END
+    # except:
+    #     update.message.reply_text("Error!")
+    #     return ConversationHandler.END
 
 
 def replyquote(symbol,update,chat_id=None,message_id=None,bot=None):
@@ -121,14 +133,15 @@ def getcalls(chat_id,symbol=None):
     c = conn.cursor()
     sqlstr="SELECT * FROM calls where chatid='"+str(chat_id)+"'"
     if symbol:
-        symbol = symbol.replace(" ", ".")
         sqlstr+="and symbol='"+symbol+"'"
 
 
     callstxt=''
     for row in c.execute(sqlstr):
         print(row)
-        callstxt+=row[4]+" : "+row[0]+" "+row[1]+"@"+row[2]+" on <i>"+row[7].strftime('%b %d %H:%M')+ "</i>\n"
+        callstxt+=row[4]+" : "+row[0]+" "+row[1]+"@"+row[2]+\
+                  " "+('SL@'+row[3] if row[3] else '') +\
+                  " on <i>"+row[7].strftime('%b %d %H:%M')+ "</i>\n"
 
     if callstxt:
         callstxt="Calls Made:\n=============================\n"+callstxt
@@ -152,25 +165,37 @@ def button(bot, update):
         query.message.reply_text("Not implemented yet")
 
 def calls(bot, update):
-     # try:
+     try:
         print(update.message.text)
         update.message.reply_text(getcalls(update.message.chat_id),parse_mode=ParseMode.HTML)
         return ConversationHandler.END
-     # except:
-     #     update.message.reply_text("Error")
-     #     return ConversationHandler.END
+     except:
+         update.message.reply_text("Error")
+         return ConversationHandler.END
 
 
 def fetchquote(symbol):
     symbolandexpiry=symbol.partition(' ')
-    response = quotefromnse.fetchquote(symbol=symbolandexpiry[0],expiry=symbolandexpiry[2])
+    #TODO HARDCODED FOR EXPIRY will change, find a better way
+    expiry = symbolandexpiry[2]
+    if expiry:
+        if 'JAN'in expiry:
+            expiry=FUTURES[0]
+        if 'FEB'in expiry:
+            expiry=FUTURES[1]
+        if 'MAR'in expiry:
+            expiry=FUTURES[2]
+
+
+    response = quotefromnse.fetchquote(symbol=symbolandexpiry[0],expiry=expiry)
     quote = response['data'][0]
-    pchange = quote['pChange']
+    pchange = quote.get('pChange','-')
 
     openkey='open'
     highkey='dayHigh'
     lowkey='dayLow'
     pclosekey='previousClose'
+    volumekey='totalTradedVolume'
 
     if symbolandexpiry[2]:
         openkey='openPrice'
@@ -178,19 +203,23 @@ def fetchquote(symbol):
         lowkey='lowPrice'
         pclosekey='prevClose'
     #changedir=':arrow_down:' if pChange.startswith('-') else ':arrow_up:'
-    return '<b>'+symbol+'@'+quote['lastPrice']+'</b> ( '+pchange+'% )\n'  \
+    return '<b>'+symbol+'@'+quote['lastPrice']+'</b> ( '+pchange+'% )\n\n'  \
             'o: '+quote[openkey]+ \
             '\th: '+quote[highkey]+'\n' \
             'l: '+quote[lowkey]+ \
-            '\tc: '+quote[pclosekey]+'\n\n'
-
+            '\tc: '+quote[pclosekey]+'\n\n' \
+            +'bestbid: '+quote['buyPrice1'] \
+            +' bestoffer: '+quote['sellPrice1']+'\n' \
+            +'buyqty: '+quote['totalBuyQuantity']\
+            +' sellqty: '+quote['totalSellQuantity']+'\n'\
+             +'<i>updated: ' + response.get('lastUpdateTime','-') + '</i>\n\n'
 
 def error(bot, update, error):
     """Log Errors caused by Updates."""
     logger.warning('Update "%s" caused error "%s"', update, error)
 
 
-def done(bot, update, user_data):
+def done(bot, update, user_data=None):
     update.message.reply_text("Happy trading")
     user_data.clear()
     return ConversationHandler.END
@@ -200,17 +229,13 @@ def call(bot, update):
     return MAKECALL
 
 
-INVALIDSYNTAX,INVALIDSYMBOL,GENERALERROR = range(3)
-
-SYNTAX="Make a call in this format\nBUY|SELL 'symbol'@'pricerange' SL@'pricerange'\ne.g BUY INFY@1000-1005 SL@995"
-
-errormsgs={INVALIDSYNTAX:"syntax oyunga kudra Try again\n",INVALIDSYMBOL:"Symbol thappu. Try again",GENERALERROR:"Unknown Error!"}
-
 def makecall(bot,update,user_data):
-    # try:
+    try:
         text=update.message.text.upper()
         tarr=text.split(' ')
-        if len(text) >50 or len(tarr)<2 or '@' not in text:
+        if text.startswith('SKIP'):
+            return done(bot,update,user_data)
+        if not validatecall(text):
             errorreplytocall(update,INVALIDSYNTAX)
             return MAKECALL
         type=tarr[0]
@@ -220,6 +245,8 @@ def makecall(bot,update,user_data):
 
         quote=''
         try:
+            # for future the syntax is <symbol>.<month>, so replace by space
+            symbol=symbol.replace('.',' ')
             quote=fetchquote(symbol)
         except:
             errorreplytocall(update,INVALIDSYMBOL)
@@ -249,15 +276,23 @@ def makecall(bot,update,user_data):
         update.message.reply_text(text="Call made\n"+quote,parse_mode=ParseMode.HTML)
         deleteoldcalls()
 
-    # except:
-    #     print("Unexpected error:", sys.exc_info()[0])
-    #     errorreplytocall(update,GENERALERROR)
+    except:
+        print("Unexpected error:", sys.exc_info()[0])
+        errorreplytocall(update,GENERALERROR)
 
-        return ConversationHandler.END
+    return ConversationHandler.END
+
+def validatecall(text):
+    tarr= text.split(' ')
+    if not text.startswith('BUY') and not text.startswith('SELL') or\
+            len(text) > 50 or len(tarr) < 2 or '@' not in text:
+        return False
+
+    return True
 
 def errorreplytocall(update,errortype):
     message = "Hi " + getusername(
-        update.message.from_user.first_name) + ",\n" + errormsgs[errortype]
+        update.message.from_user.first_name) + ",\n" + errormsgs[errortype]+"\nTry again or type 'skip' to cancel"
     update.message.reply_text(text=message, parse_mode=ParseMode.HTML)
 
 def getusername(name):
@@ -287,7 +322,8 @@ def main():
 
     # Add conversation handler with the states GENDER, PHOTO, LOCATION and BIO
     conv_handler = ConversationHandler(
-        entry_points=[CommandHandler('quote', quote),CommandHandler('call', call),CommandHandler('calls', calls)],
+        entry_points=[CommandHandler('quote', quote),CommandHandler('call', call),CommandHandler('calls', calls),
+                      CommandHandler('done', done)],
 
         states={
             SYMBOL: [MessageHandler(Filters.text,
