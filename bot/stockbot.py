@@ -20,7 +20,7 @@ bot.
 from telegram.ext import Updater, CommandHandler, MessageHandler, Filters
 import logging
 from web import quotefromnse
-from telegram import ParseMode
+from telegram import ParseMode,Chat
 from telegram.ext import (Updater, CommandHandler, MessageHandler, Filters, RegexHandler,
                           ConversationHandler,CallbackQueryHandler)
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
@@ -28,7 +28,7 @@ from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 import sqlite3
 from datetime import datetime
 import sys
-import webbrowser
+from kiteconnect import WebSocket
 
 
 
@@ -71,6 +71,10 @@ c.execute('''CREATE TABLE IF NOT EXISTS calls
              (type text, symbol text, callrange text, slrange text, 
              user text,chatid text,userid text,time timestamp,
              PRIMARY KEY (symbol,chatid,userid))''')
+
+c.execute('''CREATE TABLE IF NOT EXISTS alerts
+             (symbol text,operation text, price text, chatid text,time timestamp,
+             PRIMARY KEY (symbol,operation,chatid))''')
 c.close()
 
 
@@ -79,13 +83,13 @@ c.close()
 def start(bot, update):
     """Send a message when the command /start is issued."""
     update.message.reply_text(helptext)
-    return ConversationHandler.END
+    return nextconversation(update)
 
 
 def help(bot, update):
     """Send a message when the command /help is issued."""
     update.message.reply_text(helptext)
-    return ConversationHandler.END
+    return nextconversation(update)
 
 
 def echo(bot, update):
@@ -110,8 +114,14 @@ def quote(bot, update):
     except:
         logger.warning('quote error "%s"', error)
         update.message.reply_text("Invalid symbol or unknown error!")
-        return ConversationHandler.END
+        return nextconversation(update)
 
+def nextconversation(update):
+    type =update.message['chat'].type
+    if type==Chat.GROUP or type==Chat.SUPERGROUP:
+        return ConversationHandler.END
+    else:
+        return QUERY
 
 def replyquote(symbol,update,chat_id=None,message_id=None,bot=None):
     #when called from refresh action, update object wont have chatid
@@ -136,7 +146,7 @@ def replyquote(symbol,update,chat_id=None,message_id=None,bot=None):
                               message_id=message_id,parse_mode=ParseMode.HTML,reply_markup=reply_markup)
     else:
         update.message.reply_text(text=message, parse_mode=ParseMode.HTML,reply_markup=reply_markup)
-    return ConversationHandler.END
+    return nextconversation(update)
 
 def getcalls(chat_id,symbol=None):
 
@@ -179,10 +189,10 @@ def calls(bot, update):
      try:
         print(update.message.text)
         update.message.reply_text(getcalls(update.message.chat_id),parse_mode=ParseMode.HTML)
-        return ConversationHandler.END
+        return nextconversation(update)
      except:
          update.message.reply_text("Error")
-         return ConversationHandler.END
+         return nextconversation(update)
 
 
 def getexpiry(month):
@@ -236,7 +246,7 @@ def error(bot, update, error):
 
 def done(bot, update, user_data=None):
     update.message.reply_text("Happy trading")
-    return ConversationHandler.END
+    return nextconversation(update)
 
 def call(bot, update):
     update.message.reply_text(SYNTAX,parse_mode=ParseMode.HTML)
@@ -294,7 +304,7 @@ def makecall(bot,update,user_data):
         print("Unexpected error:", sys.exc_info()[0])
         errorreplytocall(update,GENERALERROR)
 
-    return ConversationHandler.END
+    return nextconversation(update)
 
 def validatecall(text):
     tarr= text.split(' ')
@@ -319,13 +329,21 @@ def deleteoldcalls():
     conn.commit()
     c.close()
 
+def deletealert(symbol,chatid,operation):
+    print('Deleting... ',symbol,chatid,operation)
+    conn = sqlite3.connect(dbname)
+    c = conn.cursor()
+    c.execute("delete from alerts where symbol='"+symbol+"' and operation='"+operation+"'"+" and chatid='"+chatid+"'")
+    conn.commit()
+    c.close()
+    updatealerts()
 
+updater=None
 def main():
     """Start the bot."""
     # Create the EventHandler and pass it your bot's token.
+    global updater
     updater = Updater("534849104:AAHGnCHl4Q3u-PauqDZ1tspUdoWzH702QQc")
-
-    print("Starting the bot...")
 
     # Get the dispatcher to register handlers
     dp = updater.dispatcher
@@ -334,6 +352,7 @@ def main():
 
 
     dp.add_handler(setupnewconvhandler())
+
     dp.add_handler(CallbackQueryHandler(button))
 
     # on noncommand i.e message - echo the message on Telegram
@@ -342,18 +361,72 @@ def main():
     # log all errors
     dp.add_error_handler(error)
 
+
+
+
+    print("Starting the bot...")
+
     # Start the Bot
     updater.start_polling()
+
+    startstreaming()
 
     # Run the bot until you press Ctrl-C or the process receives SIGINT,
     # SIGTERM or SIGABRT. This should be used most of the time, since
     # start_polling() is non-blocking and will stop the bot gracefully.
-    updater.idle()
+   # updater.idle()
 
 
 def query(bot, update):
     update.message.reply_text('How can I /help you?')
     return QUERY
+
+def alerts(bot,update):
+    conn = sqlite3.connect(dbname, detect_types=sqlite3.PARSE_DECLTYPES)
+    c = conn.cursor()
+    sqlstr = "SELECT * FROM alerts"
+    replytxt=''
+    for row in c.execute(sqlstr):
+        replytxt+=formatalert(row)+"\n"
+        print(row)
+    update.message.reply_text("Alerts\n"+replytxt)
+    return nextconversation(update)
+
+def formatalert(row):
+    return row[0]+" "+row[1]+" "+row[2];
+
+def alert(bot,update):
+    commands=update.message.text.upper().partition(' ')[2]
+    #split(r'(>+|<+)')
+    if '>' in commands:
+        commands=commands.split('>')
+        operation='>'
+    elif '<' in commands:
+        commands=commands.split('<')
+        operation='<'
+
+    price=commands[1].strip()
+    # symbol=commands[0].strip()
+    chat_id=update.message.chat_id
+    symbol = 'CGPOWER JAN'
+    update.message.reply_text('Alert set for CGPOWER JAN '+price)
+
+    sqlstr = '''INSERT OR REPLACE INTO alerts VALUES (?,?,?,?,?)'''
+    params = list()
+    # (symbol text,operation text, price text, chat_id text,time timestamp
+    params.append(symbol)
+    params.append(operation)
+    params.append(price)
+    params.append(chat_id)
+    params.append(datetime.now())
+
+    conn = sqlite3.connect(dbname)
+    c = conn.cursor()
+    c.execute(sqlstr, params)
+    conn.commit()
+    c.close()
+    updatealerts()
+    return nextconversation(update)
 
 
 def processquery(bot, update,user_data):
@@ -370,11 +443,16 @@ def processquery(bot, update,user_data):
         return help(bot,update)
     elif text=="Q":
         return quote(bot,update)
+    elif text.startswith('ALERTS'):
+        return alerts(bot,update)
+    elif text.startswith('ALERT'):
+        return alert(bot,update)
     elif len(text) <50:
         return quote(bot,update)
     else:
         update.message.reply_text("Not ready to handle this query")
-        return ConversationHandler.END
+
+    return nextconversation(update)
 
 
 
@@ -399,6 +477,10 @@ def setupnewconvhandler():
     )
     return conv_handler
 
+def notifyalert(chatid,text):
+    if updater and updater.bot:
+        updater.bot.send_message(chat_id=chatid,text=text)
+
 
 def setupconvhandler():
     # Add conversation handler with the states GENDER, PHOTO, LOCATION and BIO
@@ -421,6 +503,90 @@ def setupconvhandler():
         fallbacks=[RegexHandler('^Done$', done, pass_user_data=True)]
     )
     return conv_handler
+
+
+
+
+
+
+kws = WebSocket(api_key="9oykkw4mc01lm5jf", public_token="V3mTjh6XbVQk3171IoWsn863qZsmBsDL", user_id="RT1384")
+alertslist=list()
+
+
+
+# Callback for tick reception.
+def on_tick(tick, ws):
+    print (tick[0])
+    ltp=tick[0]['last_price']
+    for alert in alertslist:
+        print(alert)
+        alertprice=alert[2]
+        text=''
+        if '>' == alert[1]:
+            if ltp >= float(alertprice):
+                text="Alert: price greater than "+alertprice+" ltp: "+str(ltp)
+        else:
+            if tick[0]['last_price'] <= float(alertprice):
+                text = "Alert: price lower than " + alertprice+" ltp: "+str(ltp)
+
+        if text:
+            deletealert(alert[0],alert[3],alert[1])
+            notifyalert(int(alert[3]),text)
+
+        # if tick[0]['last_price'] > alert[2]
+        #     print('hi')
+        # else:
+        #     print('hello')
+
+
+
+def updatealerts():
+	conn = sqlite3.connect(dbname)
+	c = conn.cursor()
+	sqlstr = "SELECT * FROM alerts"
+	alertslist.clear()
+	for row in c.execute(sqlstr):
+		alertslist.append(row)
+
+	c.close();
+
+
+# Callback for successful connection.
+def on_connect(ws):
+	# Subscribe to a list of instrument_tokens (RELIANCE and ACC here).
+	ws.subscribe([11968258])
+
+	# Set RELIANCE to tick in `full` mode.
+	ws.set_mode(ws.MODE_LTP, [11968258])
+
+
+
+
+def startstreaming():
+
+	# Assign the callbacks.
+	kws.on_tick = on_tick
+	kws.on_connect = on_connect
+	updatealerts()
+
+	# To enable auto reconnect WebSocket connection in case of network failure
+	# - First param is interval between reconnection attempts in seconds.
+	# Callback `on_reconnect` is triggered on every reconnection attempt. (Default interval is 5 seconds)
+	# - Second param is maximum number of retries before the program exits triggering `on_noreconnect` calback. (Defaults to 50 attempts)
+	# Note that you can also enable auto reconnection	 while initialising websocket.
+	# Example `kws = WebSocket("your_api_key", "your_public_token", "logged_in_user_id", reconnect=True, reconnect_interval=5, reconnect_tries=50)`
+	kws.enable_reconnect(reconnect_interval=5, reconnect_tries=50)
+
+	# Infinite loop on the main thread. Nothing after this will run.
+	# You have to use the pre-defined callbacks to manage subscriptions.
+	print('Starting streaming..')
+	kws.connect()
+
+def stop():
+	if kws:
+		kws.close()
+
+
 
 if __name__ == '__main__':
     main()
