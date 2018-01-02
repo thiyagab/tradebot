@@ -38,13 +38,21 @@ logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s
 
 logger = logging.getLogger(__name__)
 
-MAKECALL, SYMBOL = range(2)
+MAKECALL, SYMBOL,QUERY = range(3)
 
 dbname='calls.db'
 equityurl='https://www.nseindia.com/live_market/dynaContent/live_watch/get_quote/GetQuote.jsp?symbol='
 futureurl='https://www.nseindia.com/live_market/dynaContent/live_watch/get_quote/GetQuoteFO.jsp?instrument=FUTSTK&expiry=%s&underlying=%s'
 
 INVALIDSYNTAX,INVALIDSYMBOL,GENERALERROR = range(3)
+
+version ='v0.0.2'
+
+helptext='The wolf ('+version+') is here to help you with your stock queries\n\n'\
+                              +'Ask me anything here /q\n'\
+                              +'1.Give me a symbol, I will give you the quote\n'\
+                              +"2.Say 'Buy infy@9000 sl@990', i will add it in calls\n" \
+                              +"3.Say 'Calls', I will give you the last 4 calls in the group\n"
 
 SYNTAX="Make a call in this format\n" \
        "BUY|SELL 'symbol'@'pricerange' SL@'pricerange'\n" \
@@ -70,13 +78,14 @@ c.close()
 # update. Error handlers also receive the raised TelegramError object in error.
 def start(bot, update):
     """Send a message when the command /start is issued."""
-    update.message.reply_text('WolfTheStockBot v0.0.1\n\nHi guys! Happy New Year!!!!\n'\
-                              +'Checkout the / commands to get started or contact thiyaga')
+    update.message.reply_text(helptext)
+    return ConversationHandler.END
 
 
 def help(bot, update):
     """Send a message when the command /help is issued."""
-    update.message.reply_text('contact thiyaga')
+    update.message.reply_text(helptext)
+    return ConversationHandler.END
 
 
 def echo(bot, update):
@@ -88,7 +97,7 @@ def quote(bot, update):
     try:
         print(update.message.text)
         text = update.message.text
-        if text.startswith("/quote"):
+        if text.startswith("/q"):
             parttext=text.partition(' ')
             if parttext[2]:
                 symbol = parttext[2].upper()
@@ -115,7 +124,7 @@ def replyquote(symbol,update,chat_id=None,message_id=None,bot=None):
     symbolandexpiry = symbol.partition(' ')
     url = equityurl+symbol
     if symbolandexpiry[2]:
-        url=futureurl % (symbolandexpiry[2],symbolandexpiry[0])
+        url=futureurl % (getexpiry(symbolandexpiry[2]),symbolandexpiry[0])
     keyboard = [[InlineKeyboardButton("Refresh", callback_data='3'+symbol),InlineKeyboardButton("More", url=url)],
         [InlineKeyboardButton("Buy", callback_data='1'+symbol),
                  InlineKeyboardButton("Sell", callback_data='2'+symbol)]]
@@ -150,7 +159,7 @@ def getcalls(chat_id,symbol=None):
     else:
         callstxt="No calls\n"
 
-    callstxt+="=============================\nmake a /call"
+    callstxt+="=============================\nmake a /q"
 
     c.close()
     return callstxt
@@ -176,19 +185,23 @@ def calls(bot, update):
          return ConversationHandler.END
 
 
+def getexpiry(month):
+    expiry=''
+    # TODO HARDCODED FOR EXPIRY will change, find a better way
+    if month:
+        if 'JAN'in month:
+            expiry=FUTURES[0]
+        elif 'FEB'in month:
+            expiry=FUTURES[1]
+        elif 'MAR'in month:
+            expiry=FUTURES[2]
+    return expiry
+
+
 def fetchquote(symbol):
     symbolandexpiry=symbol.partition(' ')
-    #TODO HARDCODED FOR EXPIRY will change, find a better way
-    expiry = symbolandexpiry[2]
-    if expiry:
-        if 'JAN'in expiry:
-            expiry=FUTURES[0]
-        if 'FEB'in expiry:
-            expiry=FUTURES[1]
-        if 'MAR'in expiry:
-            expiry=FUTURES[2]
 
-
+    expiry = getexpiry(symbolandexpiry[2])
     response = quotefromnse.fetchquote(symbol=symbolandexpiry[0],expiry=expiry)
     quote = response['data'][0]
     pchange = quote.get('pChange','-')
@@ -223,7 +236,6 @@ def error(bot, update, error):
 
 def done(bot, update, user_data=None):
     update.message.reply_text("Happy trading")
-    user_data.clear()
     return ConversationHandler.END
 
 def call(bot, update):
@@ -318,30 +330,10 @@ def main():
     # Get the dispatcher to register handlers
     dp = updater.dispatcher
 
-    # on different commands - answer in Telegram
-   # dp.add_handler(CommandHandler("start", start))
-    #dp.add_handler(CommandHandler("help", help))
 
-    # Add conversation handler with the states GENDER, PHOTO, LOCATION and BIO
-    conv_handler = ConversationHandler(
-        entry_points=[CommandHandler('start', start),CommandHandler('quote', quote),CommandHandler('call', call),CommandHandler('calls', calls),
-                      CommandHandler('done', done)],
 
-        states={
-            SYMBOL: [MessageHandler(Filters.text,
-                                           quote,
-                                           pass_user_data=False),
-                            ],
-            MAKECALL: [MessageHandler(Filters.text,
-                                    makecall,
-                                    pass_user_data=True),
-                     ]
-        },
 
-        fallbacks=[RegexHandler('^Done$', done, pass_user_data=True)]
-    )
-
-    dp.add_handler(conv_handler)
+    dp.add_handler(setupnewconvhandler())
     dp.add_handler(CallbackQueryHandler(button))
 
     # on noncommand i.e message - echo the message on Telegram
@@ -358,6 +350,77 @@ def main():
     # start_polling() is non-blocking and will stop the bot gracefully.
     updater.idle()
 
+
+def query(bot, update):
+    update.message.reply_text('How can I /help you?')
+    return QUERY
+
+
+def processquery(bot, update,user_data):
+    print(update.message.text)
+    text=update.message.text.upper()
+    #query may contain commands again, so process the commands too
+    if(text.startswith('/')):
+        text=text[1:]
+    if text.startswith(('BUY','SELL','SHORT')):
+        return makecall(bot,update,user_data)
+    elif text.startswith('CALLS'):
+        return calls(bot,update)
+    elif text=="HELP":
+        return help(bot,update)
+    elif text=="Q":
+        return quote(bot,update)
+    elif len(text) <50:
+        return quote(bot,update)
+    else:
+        update.message.reply_text("Not ready to handle this query")
+        return ConversationHandler.END
+
+
+
+
+def setupnewconvhandler():
+    # Add conversation handler with the states GENDER, PHOTO, LOCATION and BIO
+    conv_handler = ConversationHandler(
+        entry_points=[CommandHandler('start', start), CommandHandler('q', query),
+                      CommandHandler('help', help),
+                      CommandHandler('cancel', done)],
+
+        states={
+            QUERY: [MessageHandler(Filters.text,
+                                    processquery,
+                                    pass_user_data=True),
+
+                    MessageHandler(Filters.command,processquery,pass_user_data=True)
+                     ]
+        },
+
+        fallbacks=[RegexHandler('^Done$', done, pass_user_data=True)]
+    )
+    return conv_handler
+
+
+def setupconvhandler():
+    # Add conversation handler with the states GENDER, PHOTO, LOCATION and BIO
+    conv_handler = ConversationHandler(
+        entry_points=[CommandHandler('start', start), CommandHandler('quote', quote), CommandHandler('call', call),
+                      CommandHandler('calls', calls),
+                      CommandHandler('done', done)],
+
+        states={
+            SYMBOL: [MessageHandler(Filters.text,
+                                    quote,
+                                    pass_user_data=False),
+                     ],
+            MAKECALL: [MessageHandler(Filters.text,
+                                      makecall,
+                                      pass_user_data=True),
+                       ]
+        },
+
+        fallbacks=[RegexHandler('^Done$', done, pass_user_data=True)]
+    )
+    return conv_handler
 
 if __name__ == '__main__':
     main()
