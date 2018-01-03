@@ -46,13 +46,15 @@ futureurl='https://www.nseindia.com/live_market/dynaContent/live_watch/get_quote
 
 INVALIDSYNTAX,INVALIDSYMBOL,GENERALERROR = range(3)
 
-version ='v0.0.2'
+version ='v0.0.3'
 
-helptext='The wolf ('+version+') is here to help you with your stock queries\n\n'\
-                              +'Ask me anything here /q\n'\
-                              +'1.Give me a symbol, I will give you the quote\n'\
-                              +"2.Say 'Buy infy@9000 sl@990', i will add it in calls\n" \
-                              +"3.Say 'Calls', I will give you the last 4 calls in the group\n"
+HELPTXT= 'The wolf (' + version + ') is here to help you with your stock queries\n\n' \
+         +'Ask me anything here /q\n' \
+         +'1.Give me a symbol, I will give you the quote\n' \
+         +"2.Say 'Buy infy@9000 sl@990', i will add it in calls\n" \
+         +"3.Say 'Calls', I will give you the last 4 calls in the group\n"
+
+STARTCONV='How can I /help you?'
 
 SYNTAX="Make a call in this format\n" \
        "BUY|SELL 'symbol'@'pricerange' SL@'pricerange'\n" \
@@ -82,13 +84,13 @@ c.close()
 # update. Error handlers also receive the raised TelegramError object in error.
 def start(bot, update):
     """Send a message when the command /start is issued."""
-    update.message.reply_text(helptext)
+    update.message.reply_text(HELPTXT)
     return nextconversation(update)
 
 
 def help(bot, update):
     """Send a message when the command /help is issued."""
-    update.message.reply_text(helptext)
+    update.message.reply_text(HELPTXT)
     return nextconversation(update)
 
 
@@ -107,8 +109,11 @@ def quote(bot, update):
                 symbol = parttext[2].upper()
                 return replyquote(symbol,update)
             else:
-                update.message.reply_text('nse symbol?\n(for futures, <symbol> <month>')
-                return SYMBOL
+                if isgroup(update):
+                    update.message.reply_text('nse symbol?\n(for futures, <symbol> <month>')
+                else:
+                    update.message.reply_text(STARTCONV)
+                return QUERY
         else:
             return replyquote(text.upper(), update)
     except:
@@ -117,11 +122,15 @@ def quote(bot, update):
         return nextconversation(update)
 
 def nextconversation(update):
-    type =update.message['chat'].type
-    if type==Chat.GROUP or type==Chat.SUPERGROUP:
+    if isgroup(update):
         return ConversationHandler.END
     else:
         return QUERY
+
+def isgroup(update):
+    type = update.message['chat'].type
+    return (type == Chat.GROUP or type == Chat.SUPERGROUP)
+
 
 def replyquote(symbol,update,chat_id=None,message_id=None,bot=None):
     #when called from refresh action, update object wont have chatid
@@ -130,6 +139,9 @@ def replyquote(symbol,update,chat_id=None,message_id=None,bot=None):
 
     message = fetchquote(symbol)
     message+=getcalls(chat_id,symbol)
+
+    if isgroup(update):
+        message+="\n Make a \q"
 
     symbolandexpiry = symbol.partition(' ')
     url = equityurl+symbol
@@ -169,7 +181,7 @@ def getcalls(chat_id,symbol=None):
     else:
         callstxt="No calls\n"
 
-    callstxt+="=============================\nmake a /q"
+    callstxt+="=============================\n"
 
     c.close()
     return callstxt
@@ -378,18 +390,24 @@ def main():
 
 
 def query(bot, update):
-    update.message.reply_text('How can I /help you?')
-    return QUERY
+    command=update.message.text.upper().partition(' ')[2]
+    if command:
+        update.message.text=command
+        return processquery(bot,update,None)
+    else:
+        update.message.reply_text(STARTCONV)
+        return QUERY
 
 def alerts(bot,update):
     conn = sqlite3.connect(dbname, detect_types=sqlite3.PARSE_DECLTYPES)
     c = conn.cursor()
-    sqlstr = "SELECT * FROM alerts"
+    sqlstr = "SELECT * FROM alerts where chatid='"+str(update.message.chat_id)+"'"
     replytxt=''
     for row in c.execute(sqlstr):
         replytxt+=formatalert(row)+"\n"
         print(row)
-    update.message.reply_text("Alerts\n"+replytxt)
+
+    update.message.reply_text("Alerts\n"+replytxt if replytxt else ': None')
     return nextconversation(update)
 
 def formatalert(row):
@@ -413,7 +431,7 @@ def alert(bot,update):
 
     sqlstr = '''INSERT OR REPLACE INTO alerts VALUES (?,?,?,?,?)'''
     params = list()
-    # (symbol text,operation text, price text, chat_id text,time timestamp
+    # (symbol text,operation text, price text, chatid text,time timestamp
     params.append(symbol)
     params.append(operation)
     params.append(price)
