@@ -128,7 +128,7 @@ def nextconversation(update):
         return QUERY
 
 def isgroup(update):
-    type = update.message['chat'].type
+    type = update.effective_chat.type
     return (type == Chat.GROUP or type == Chat.SUPERGROUP)
 
 
@@ -240,16 +240,17 @@ def fetchquote(symbol):
         lowkey='lowPrice'
         pclosekey='prevClose'
     #changedir=':arrow_down:' if pChange.startswith('-') else ':arrow_up:'
-    return '<b>'+symbol+'@'+quote['lastPrice']+'</b> ( '+pchange+'% )\n\n'  \
-            'o: '+quote[openkey]+ \
+    return '<b>'+symbol+'@'+quote['lastPrice']+'</b> ( '+pchange+'% )\n' \
+           + '<i>updated: ' + response.get('lastUpdateTime', '-') + '</i>\n\n' \
+           + 'o: '+quote[openkey]+ \
             '\th: '+quote[highkey]+'\n' \
             'l: '+quote[lowkey]+ \
             '\tc: '+quote[pclosekey]+'\n\n' \
             +'bestbid: '+quote['buyPrice1'] \
             +' bestoffer: '+quote['sellPrice1']+'\n' \
             +'buyqty: '+quote['totalBuyQuantity']\
-            +' sellqty: '+quote['totalSellQuantity']+'\n'\
-             +'<i>updated: ' + response.get('lastUpdateTime','-') + '</i>\n\n'
+            +' sellqty: '+quote['totalSellQuantity']+'\n\n'\
+
 
 def error(bot, update, error):
     """Log Errors caused by Updates."""
@@ -350,11 +351,26 @@ def deletealert(symbol,chatid,operation):
     c.close()
     updatealerts()
 
+def deletecall(symbol,update):
+    userid=update.message.from_user.id
+    chatid=update.message.chat_id
+    print('Deleting call... ', symbol, chatid)
+    conn = sqlite3.connect(dbname)
+    c = conn.cursor()
+    c.execute(
+        "delete from calls where symbol='" + symbol + "' and userid='" + str(userid) + "'" + " and chatid='" + str(chatid) + "'")
+    conn.commit()
+    c.close()
+    update.message.reply_text("Call for "+symbol+" deleted")
+
+
 updater=None
 def main():
     """Start the bot."""
     # Create the EventHandler and pass it your bot's token.
     global updater
+    #535372141:AAEgx8VtahWGWWUYhFcYR0zonqIHycRMXi0   - dev token
+    #534849104:AAHGnCHl4Q3u-PauqDZ1tspUdoWzH702QQc   - live token
     updater = Updater("534849104:AAHGnCHl4Q3u-PauqDZ1tspUdoWzH702QQc")
 
     # Get the dispatcher to register handlers
@@ -450,29 +466,35 @@ def alert(bot,update):
 def processquery(bot, update,user_data):
     print(update.message.text)
     text=update.message.text.upper()
-    #query may contain commands again, so process the commands too
-    if text.startswith('/'):
-        #ppl may use /q alerts or /q infy in private chat itself, lets process same as in group
-        if text.startswith('/q '):
-            text=text[3:]
+    try:
+        #query may contain commands again, so process the commands too
+        if text.startswith('/'):
+            #ppl may use /q alerts or /q infy in private chat itself, lets process same as in group
+            if text.startswith('/Q '):
+                text=text[3:]
+            else:
+                text=text[1:]
+        if text.startswith(('BUY','SELL','SHORT')):
+            return makecall(bot,update,user_data)
+        elif text.startswith('CALLS'):
+            return calls(bot,update)
+        elif text.startswith("HELP"):
+            return help(bot,update)
+        elif text=="Q":
+            return quote(bot,update)
+        elif text.startswith('ALERTS'):
+            return alerts(bot,update)
+        elif text.startswith('DELETE'):
+            symbol=text.partition(' ')[2]
+            return deletecall(symbol,update)
+        elif text.startswith('ALERT'):
+            return alert(bot,update)
+        elif len(text) <50:
+            return quote(bot,update)
         else:
-            text=text[1:]
-    if text.startswith(('BUY','SELL','SHORT')):
-        return makecall(bot,update,user_data)
-    elif text.startswith('CALLS'):
-        return calls(bot,update)
-    elif text=="HELP":
-        return help(bot,update)
-    elif text=="Q":
-        return quote(bot,update)
-    elif text.startswith('ALERTS'):
-        return alerts(bot,update)
-    elif text.startswith('ALERT'):
-        return alert(bot,update)
-    elif len(text) <50:
-        return quote(bot,update)
-    else:
-        update.message.reply_text("Not ready to handle this query")
+            update.message.reply_text("Not ready to handle this query")
+    except:
+        update.message.reply_text("Error")
 
     return nextconversation(update)
 
