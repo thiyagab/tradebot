@@ -141,7 +141,7 @@ def replyquote(symbol,update,chat_id=None,message_id=None,bot=None):
     message+=getcalls(chat_id,symbol)
 
     if isgroup(update):
-        message+="\n Make a \q"
+        message+="\n Make a /q"
 
     symbolandexpiry = symbol.partition(' ')
     url = equityurl+symbol
@@ -407,7 +407,7 @@ def alerts(bot,update):
         replytxt+=formatalert(row)+"\n"
         print(row)
 
-    update.message.reply_text("Alerts\n"+replytxt if replytxt else ': None')
+    update.message.reply_text("Alerts:\n"+(replytxt if replytxt else 'None'))
     return nextconversation(update)
 
 def formatalert(row):
@@ -451,8 +451,12 @@ def processquery(bot, update,user_data):
     print(update.message.text)
     text=update.message.text.upper()
     #query may contain commands again, so process the commands too
-    if(text.startswith('/')):
-        text=text[1:]
+    if text.startswith('/'):
+        #ppl may use /q alerts or /q infy in private chat itself, lets process same as in group
+        if text.startswith('/q '):
+            text=text[3:]
+        else:
+            text=text[1:]
     if text.startswith(('BUY','SELL','SHORT')):
         return makecall(bot,update,user_data)
     elif text.startswith('CALLS'):
