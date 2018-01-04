@@ -453,7 +453,7 @@ def alert(bot,update):
         return nextconversation(update)
 
     chat_id=update.message.chat_id
-    symbol = 'CGPOWER JAN'
+    #symbol = 'CGPOWER JAN'
     update.message.reply_text('Alert set for CGPOWER JAN '+price)
 
     sqlstr = '''INSERT OR REPLACE INTO alerts VALUES (?,?,?,?,?)'''
