@@ -25,10 +25,9 @@ from telegram.ext import (Updater, CommandHandler, MessageHandler, Filters, Rege
                           ConversationHandler,CallbackQueryHandler)
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 
-import sqlite3
-from datetime import datetime
 import sys
 from kiteconnect import WebSocket
+from bot import dbhandler
 
 
 
@@ -40,7 +39,6 @@ logger = logging.getLogger(__name__)
 
 MAKECALL, SYMBOL,QUERY = range(3)
 
-dbname='calls.db'
 equityurl='https://www.nseindia.com/live_market/dynaContent/live_watch/get_quote/GetQuote.jsp?symbol='
 futureurl='https://www.nseindia.com/live_market/dynaContent/live_watch/get_quote/GetQuoteFO.jsp?instrument=FUTSTK&expiry=%s&underlying=%s'
 
@@ -65,19 +63,6 @@ SYNTAX="Make a call in this format\n" \
 errormsgs={INVALIDSYNTAX:"syntax oyunga kudra\n",INVALIDSYMBOL:"Symbol thappu.",GENERALERROR:"Unknown Error!"}
 
 FUTURES=('25JAN2018','22FEB2018','28MAR2018')
-
-conn = sqlite3.connect(dbname)
-c=conn.cursor()
-# Create table
-c.execute('''CREATE TABLE IF NOT EXISTS calls
-             (type text, symbol text, callrange text, misc text, 
-             user text,chatid text,userid text,time timestamp,
-             PRIMARY KEY (symbol,chatid,userid))''')
-
-c.execute('''CREATE TABLE IF NOT EXISTS alerts
-             (symbol text,operation text, price text, chatid text,time timestamp,
-             PRIMARY KEY (symbol,operation,chatid))''')
-c.close()
 
 
 # Define a few command handlers. These usually take the two arguments bot and
@@ -162,19 +147,7 @@ def replyquote(symbol,update,chat_id=None,message_id=None,bot=None):
 
 def getcalls(chat_id,symbol=None):
 
-    conn = sqlite3.connect(dbname,detect_types=sqlite3.PARSE_DECLTYPES)
-    c = conn.cursor()
-    sqlstr="SELECT * FROM calls where chatid='"+str(chat_id)+"'"
-    if symbol:
-        sqlstr+="and symbol='"+symbol+"'"
-
-
-    callstxt=''
-    for row in c.execute(sqlstr):
-        print(row)
-        callstxt+=row[4]+" : "+row[0]+" "+row[1]+"@"+row[2]+\
-                  " "+row[3] +\
-                  " on <i>"+row[7].strftime('%b %d %H:%M')+ "</i>\n"
+    callstxt=getcalls(str(chat_id),symbol)
 
     if callstxt:
         callstxt="Calls Made:\n==========\n"+callstxt
@@ -183,7 +156,6 @@ def getcalls(chat_id,symbol=None):
 
     callstxt+="==========\n"
 
-    c.close()
     return callstxt
 
 
@@ -284,26 +256,9 @@ def makecall(bot,update,user_data):
             errorreplytocall(update,INVALIDSYMBOL)
             return MAKECALL
 
-        sqlstr='''INSERT OR REPLACE INTO calls VALUES (?,?,?,?,?,?,?,?)'''
-        params= list()
-        # (type text, symbol text, callrange text, slrange text, user text, chatid text, userid text
-        params.append(type)
-        params.append(symbol)
-        params.append(callrange)
-        params.append(misc)
-        params.append(update.message.from_user.first_name)
-        params.append(update.message.chat_id)
-        params.append(update.message.from_user.id)
-        params.append(datetime.now())
-
-        conn = sqlite3.connect(dbname)
-        c = conn.cursor()
-        c.execute(sqlstr,params)
-        conn.commit()
-        c.close()
-
+        dbhandler.createcall(symbol,callrange,misc,update.message.from_user.first_name,update.message.chat_id,update.message.from_user.id)
         update.message.reply_text(text="Call made\n"+quote,parse_mode=ParseMode.HTML)
-        deleteoldcalls()
+        dbhandler.deleteoldcalls()
 
     except:
         print("Unexpected error:", sys.exc_info()[0])
@@ -337,41 +292,25 @@ def errorreplytocall(update,errortype):
 def getusername(name):
     return name
 
-def deleteoldcalls():
-    conn = sqlite3.connect(dbname)
-    c = conn.cursor()
-    c.execute('delete from calls where time not in (select time from calls order by time desc limit 5)')
-    conn.commit()
-    c.close()
 
-def deletealert(symbol,chatid,operation):
-    print('Deleting... ',symbol,chatid,operation)
-    conn = sqlite3.connect(dbname)
-    c = conn.cursor()
-    c.execute("delete from alerts where symbol='"+symbol+"' and operation='"+operation+"'"+" and chatid='"+chatid+"'")
-    conn.commit()
-    c.close()
-    updatealerts()
+
 
 def deletecall(symbol,update):
     userid=update.message.from_user.id
     chatid=update.message.chat_id
-    print('Deleting call... ', symbol, chatid)
-    conn = sqlite3.connect(dbname)
-    c = conn.cursor()
-    c.execute(
-        "delete from calls where symbol='" + symbol + "' and userid='" + str(userid) + "'" + " and chatid='" + str(chatid) + "'")
-    if c.rowcount>0:
+    rowcount=dbhandler.deletecall(symbol,userid,chatid)
+    if rowcount>0:
         update.message.reply_text("Call for " + symbol + " deleted")
     else:
         update.message.reply_text("No calls for symbol "+symbol)
-    conn.commit()
-    c.close()
 
 
 
 updater=None
 def main():
+
+    dbhandler.initdb()
+
     """Start the bot."""
     # Create the EventHandler and pass it your bot's token.
     global updater
@@ -422,19 +361,9 @@ def query(bot, update):
         return QUERY
 
 def alerts(bot,update):
-    conn = sqlite3.connect(dbname, detect_types=sqlite3.PARSE_DECLTYPES)
-    c = conn.cursor()
-    sqlstr = "SELECT * FROM alerts where chatid='"+str(update.message.chat_id)+"'"
-    replytxt=''
-    for row in c.execute(sqlstr):
-        replytxt+=formatalert(row)+"\n"
-        print(row)
-
+    replytxt=dbhandler.getalerts(str(update.message.chat_id))
     update.message.reply_text("Alerts:\n"+(replytxt if replytxt else 'None'))
     return nextconversation(update)
-
-def formatalert(row):
-    return row[0]+" "+row[1]+" "+row[2];
 
 def alert(bot,update):
     commands=update.message.text.upper().partition(' ')[2]
@@ -453,24 +382,8 @@ def alert(bot,update):
         return nextconversation(update)
 
     chat_id=update.message.chat_id
-    #symbol = 'CGPOWER JAN'
     update.message.reply_text('Alert set for '+symbol+" "+price)
-
-    sqlstr = '''INSERT OR REPLACE INTO alerts VALUES (?,?,?,?,?)'''
-    params = list()
-    # (symbol text,operation text, price text, chatid text,time timestamp
-    params.append(symbol)
-    params.append(operation)
-    params.append(price)
-    params.append(chat_id)
-    params.append(datetime.now())
-
-    conn = sqlite3.connect(dbname)
-    c = conn.cursor()
-    c.execute(sqlstr, params)
-    conn.commit()
-    c.close()
-    updatealerts()
+    dbhandler.createalert(symbol,operation,price,chat_id)
     return nextconversation(update)
 
 
@@ -590,7 +503,7 @@ def on_tick(ticks, ws):
                         text = "Alert: price lower than " + alertprice+" ltp: "+str(ltp)+" for "+alert[0]
 
                 if text:
-                    deletealert(alert[0],alert[3],alert[1])
+                    dbhandler.deletealert(alert[0],alert[3],alert[1])
                     notifyalert(int(alert[3]),text)
 
         # if tick[0]['last_price'] > alert[2]
@@ -600,15 +513,7 @@ def on_tick(ticks, ws):
 
 
 
-def updatealerts():
-	conn = sqlite3.connect(dbname)
-	c = conn.cursor()
-	sqlstr = "SELECT * FROM alerts"
-	alertslist.clear()
-	for row in c.execute(sqlstr):
-		alertslist.append(row)
 
-	c.close();
 
 
 SUNTVJAN=12055042
@@ -633,7 +538,7 @@ def startstreaming():
 	# Assign the callbacks.
 	kws.on_tick = on_tick
 	kws.on_connect = on_connect
-	updatealerts()
+	dbhandler.updatealerts()
 
 	# To enable auto reconnect WebSocket connection in case of network failure
 	# - First param is interval between reconnection attempts in seconds.
