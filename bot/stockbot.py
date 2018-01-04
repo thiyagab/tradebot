@@ -46,7 +46,7 @@ futureurl='https://www.nseindia.com/live_market/dynaContent/live_watch/get_quote
 
 INVALIDSYNTAX,INVALIDSYMBOL,GENERALERROR = range(3)
 
-version ='v0.0.3'
+version ='v0.0.4'
 
 HELPTXT= 'The wolf (' + version + ') is here to help you with your stock queries\n\n' \
          +'Ask me anything here /q\n' \
@@ -70,7 +70,7 @@ conn = sqlite3.connect(dbname)
 c=conn.cursor()
 # Create table
 c.execute('''CREATE TABLE IF NOT EXISTS calls
-             (type text, symbol text, callrange text, slrange text, 
+             (type text, symbol text, callrange text, misc text, 
              user text,chatid text,userid text,time timestamp,
              PRIMARY KEY (symbol,chatid,userid))''')
 
@@ -173,15 +173,15 @@ def getcalls(chat_id,symbol=None):
     for row in c.execute(sqlstr):
         print(row)
         callstxt+=row[4]+" : "+row[0]+" "+row[1]+"@"+row[2]+\
-                  " "+('SL@'+row[3] if row[3] else '') +\
+                  " "+row[3] +\
                   " on <i>"+row[7].strftime('%b %d %H:%M')+ "</i>\n"
 
     if callstxt:
-        callstxt="Calls Made:\n=============================\n"+callstxt
+        callstxt="Calls Made:\n==========\n"+callstxt
     else:
         callstxt="No calls\n"
 
-    callstxt+="=============================\n"
+    callstxt+="==========\n"
 
     c.close()
     return callstxt
@@ -269,28 +269,20 @@ def call(bot, update):
 def makecall(bot,update,user_data):
     try:
         text=update.message.text.upper()
-        tarr=text.split(' ')
         if text.startswith('SKIP'):
             return done(bot,update,user_data)
         if not validatecall(text):
             errorreplytocall(update,INVALIDSYNTAX)
             return MAKECALL
-        type=tarr[0]
-        symbol =tarr[1].split('@')[0]
-        callrange = tarr[1].split('@')[1]
-        slrange=''
+
+        type,symbol,callrange,misc=tokenizecallquery(text)
 
         quote=''
         try:
-            # for future the syntax is <symbol>.<month>, so replace by space
-            symbol=symbol.replace('.',' ')
             quote=fetchquote(symbol)
         except:
             errorreplytocall(update,INVALIDSYMBOL)
             return MAKECALL
-
-        if len(tarr) >2:
-            slrange=tarr[2].split('@')[1]
 
         sqlstr='''INSERT OR REPLACE INTO calls VALUES (?,?,?,?,?,?,?,?)'''
         params= list()
@@ -298,7 +290,7 @@ def makecall(bot,update,user_data):
         params.append(type)
         params.append(symbol)
         params.append(callrange)
-        params.append(slrange)
+        params.append(misc)
         params.append(update.message.from_user.first_name)
         params.append(update.message.chat_id)
         params.append(update.message.from_user.id)
@@ -318,6 +310,16 @@ def makecall(bot,update,user_data):
         errorreplytocall(update,GENERALERROR)
 
     return nextconversation(update)
+
+def tokenizecallquery(text):
+    tokens = text.partition(' ')
+    type = tokens[0]
+    tokens=tokens[2].partition('@')
+    symbol=tokens[0].strip()
+    tokens=tokens[2].strip().partition(' ')
+    callrange=tokens[0].strip()
+    addtext=tokens[2]
+    return type, symbol, callrange,addtext
 
 def validatecall(text):
     tarr= text.split(' ')
@@ -359,9 +361,13 @@ def deletecall(symbol,update):
     c = conn.cursor()
     c.execute(
         "delete from calls where symbol='" + symbol + "' and userid='" + str(userid) + "'" + " and chatid='" + str(chatid) + "'")
+    if c.rowcount>0:
+        update.message.reply_text("Call for " + symbol + " deleted")
+    else:
+        update.message.reply_text("No calls for symbol "+symbol)
     conn.commit()
     c.close()
-    update.message.reply_text("Call for "+symbol+" deleted")
+
 
 
 updater=None
@@ -371,6 +377,7 @@ def main():
     global updater
     #535372141:AAEgx8VtahWGWWUYhFcYR0zonqIHycRMXi0   - dev token
     #534849104:AAHGnCHl4Q3u-PauqDZ1tspUdoWzH702QQc   - live token
+
     updater = Updater("534849104:AAHGnCHl4Q3u-PauqDZ1tspUdoWzH702QQc")
 
     # Get the dispatcher to register handlers
@@ -440,7 +447,11 @@ def alert(bot,update):
         operation='<'
 
     price=commands[1].strip()
-    # symbol=commands[0].strip()
+    symbol=commands[0].strip()
+    if symbol not in symbolmap.keys():
+        update.message.reply_text(symbol+" not supported")
+        return nextconversation(update)
+
     chat_id=update.message.chat_id
     symbol = 'CGPOWER JAN'
     update.message.reply_text('Alert set for CGPOWER JAN '+price)
@@ -559,23 +570,28 @@ alertslist=list()
 
 
 # Callback for tick reception.
-def on_tick(tick, ws):
-    print (tick[0])
-    ltp=tick[0]['last_price']
-    for alert in alertslist:
-        print(alert)
-        alertprice=alert[2]
-        text=''
-        if '>' == alert[1]:
-            if ltp >= float(alertprice):
-                text="Alert: price greater than "+alertprice+" ltp: "+str(ltp)
-        else:
-            if tick[0]['last_price'] <= float(alertprice):
-                text = "Alert: price lower than " + alertprice+" ltp: "+str(ltp)
+def on_tick(ticks, ws):
 
-        if text:
-            deletealert(alert[0],alert[3],alert[1])
-            notifyalert(int(alert[3]),text)
+    for tick in ticks:
+        print(tick)
+        ltp=tick['last_price']
+        id=tick['instrument_token']
+        for alert in alertslist:
+            print(alert)
+            alertprice=alert[2]
+            text=''
+            alertid= symbolmap.get(alert[0])
+            if id==alertid:
+                if '>' == alert[1]:
+                    if ltp >= float(alertprice):
+                        text="Alert: price greater than "+alertprice+" ltp: "+str(ltp)+" for "+alert[0]
+                else:
+                    if tick[0]['last_price'] <= float(alertprice):
+                        text = "Alert: price lower than " + alertprice+" ltp: "+str(ltp)+" for "+alert[0]
+
+                if text:
+                    deletealert(alert[0],alert[3],alert[1])
+                    notifyalert(int(alert[3]),text)
 
         # if tick[0]['last_price'] > alert[2]
         #     print('hi')
@@ -595,13 +611,19 @@ def updatealerts():
 	c.close();
 
 
+SUNTVJAN=12055042
+CGPOWERFEB=14649602
+CGPOWERJAN=11968258
+
+symbolmap={"CGPOWER JAN":CGPOWERJAN,"CGPOWER FEB":CGPOWERFEB,"SUNTV JAN":SUNTVJAN}
+
 # Callback for successful connection.
 def on_connect(ws):
 	# Subscribe to a list of instrument_tokens (RELIANCE and ACC here).
-	ws.subscribe([11968258])
+	ws.subscribe([CGPOWERJAN,CGPOWERFEB,SUNTVJAN])
 
 	# Set RELIANCE to tick in `full` mode.
-	ws.set_mode(ws.MODE_LTP, [11968258])
+	ws.set_mode(ws.MODE_LTP, [CGPOWERJAN,CGPOWERFEB,SUNTVJAN])
 
 
 
