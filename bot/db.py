@@ -1,6 +1,10 @@
 import sqlite3
+from datetime import datetime
 
 DBNAME="wolfca.db"
+
+#TODO this may not work with multiple threads updating and reading
+#from this list, need to find efficient way
 alertslist=list()
 
 def initdb():
@@ -76,7 +80,7 @@ def createalert(symbol,operation,price,chat_id):
     params.append(operation)
     params.append(price)
     params.append(chat_id)
-    params.append(sqlite3.datetime.now())
+    params.append(datetime.now())
 
     conn = sqlite3.connect(DBNAME)
     c = conn.cursor()
@@ -85,7 +89,7 @@ def createalert(symbol,operation,price,chat_id):
     c.close()
     updatealerts()
 
-def getcalls(symbol,chatid):
+def getcalls(chatid,symbol):
     conn = sqlite3.connect(DBNAME, detect_types=sqlite3.PARSE_DECLTYPES)
     c = conn.cursor()
     sqlstr = "SELECT * FROM calls where chatid='" + chatid + "'"
@@ -100,7 +104,7 @@ def getcalls(symbol,chatid):
                     " on <i>" + row[7].strftime('%b %d %H:%M') + "</i>\n"
     return callstxt
 
-def createcall(symbol,callrange,misc,user,chatid,userid):
+def createcall(type,symbol,callrange,misc,user,chatid,userid):
     sqlstr = '''INSERT OR REPLACE INTO calls VALUES (?,?,?,?,?,?,?,?)'''
     params = list()
     # (type text, symbol text, callrange text, slrange text, user text, chatid text, userid text
@@ -111,7 +115,7 @@ def createcall(symbol,callrange,misc,user,chatid,userid):
     params.append(user)
     params.append(chatid)
     params.append(userid)
-    params.append(sqlite3.datetime.now())
+    params.append(datetime.now())
 
     conn = sqlite3.connect(DBNAME)
     c = conn.cursor()

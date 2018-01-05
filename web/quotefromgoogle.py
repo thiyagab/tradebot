@@ -10,8 +10,10 @@ if rsp.status_code in (200,):
     # This then allows you to load the resulting string
     # with the JSON module.
     fin_data = json.loads(rsp.content[6:-2].decode('unicode_escape'))
-
+    print(fin_data)
     # print out some quote data
+    print('Price: {}'.format(fin_data['l']))
+    print('change percentage: {}'.format(fin_data['l']))
     print('Opening Price: {}'.format(fin_data['op']))
     print('Price/Earnings Ratio: {}'.format(fin_data['pe']))
     print('52-week high: {}'.format(fin_data['hi52']))

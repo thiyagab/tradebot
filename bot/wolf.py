@@ -19,15 +19,13 @@ bot.
 
 from telegram.ext import Updater, CommandHandler, MessageHandler, Filters
 import logging
-from web import quotefromnse
 from telegram import ParseMode,Chat
 from telegram.ext import (Updater, CommandHandler, MessageHandler, Filters, RegexHandler,
                           ConversationHandler,CallbackQueryHandler)
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 
 import sys
-from kiteconnect import WebSocket
-from bot import dbhandler
+from bot import db,data
 
 
 
@@ -38,15 +36,10 @@ logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s
 logger = logging.getLogger(__name__)
 
 MAKECALL, SYMBOL,QUERY = range(3)
-
-equityurl='https://www.nseindia.com/live_market/dynaContent/live_watch/get_quote/GetQuote.jsp?symbol='
-futureurl='https://www.nseindia.com/live_market/dynaContent/live_watch/get_quote/GetQuoteFO.jsp?instrument=FUTSTK&expiry=%s&underlying=%s'
-
 INVALIDSYNTAX,INVALIDSYMBOL,GENERALERROR = range(3)
+VERSION = 'v0.0.4'
 
-version ='v0.0.4'
-
-HELPTXT= 'The wolf (' + version + ') is here to help you with your stock queries\n\n' \
+HELPTXT= 'The wolf (' + VERSION + ') is here to help you with your stock queries\n\n' \
          +'Ask me anything here /q\n' \
          +'1.Give me a symbol, I will give you the quote\n' \
          +"2.Say 'Buy infy@9000 sl@990', i will add it in calls\n" \
@@ -62,7 +55,7 @@ SYNTAX="Make a call in this format\n" \
 
 errormsgs={INVALIDSYNTAX:"syntax oyunga kudra\n",INVALIDSYMBOL:"Symbol thappu.",GENERALERROR:"Unknown Error!"}
 
-FUTURES=('25JAN2018','22FEB2018','28MAR2018')
+
 
 
 # Define a few command handlers. These usually take the two arguments bot and
@@ -122,16 +115,14 @@ def replyquote(symbol,update,chat_id=None,message_id=None,bot=None):
     if update.message:
         chat_id=update.message.chat_id
 
-    message = fetchquote(symbol)
+    message = data.fetchquote(symbol)
     message+=getcalls(chat_id,symbol)
 
     if isgroup(update):
         message+="\n Make a /q"
 
-    symbolandexpiry = symbol.partition(' ')
-    url = equityurl+symbol
-    if symbolandexpiry[2]:
-        url=futureurl % (getexpiry(symbolandexpiry[2]),symbolandexpiry[0])
+
+    url = data.geturl(symbol)
     keyboard = [[InlineKeyboardButton("Refresh", callback_data='3'+symbol),InlineKeyboardButton("More", url=url)],
         [InlineKeyboardButton("Buy", callback_data='1'+symbol),
                  InlineKeyboardButton("Sell", callback_data='2'+symbol)]]
@@ -147,7 +138,7 @@ def replyquote(symbol,update,chat_id=None,message_id=None,bot=None):
 
 def getcalls(chat_id,symbol=None):
 
-    callstxt=getcalls(str(chat_id),symbol)
+    callstxt=db.getcalls(str(chat_id),symbol)
 
     if callstxt:
         callstxt="Calls Made:\n==========\n"+callstxt
@@ -174,54 +165,10 @@ def calls(bot, update):
         print(update.message.text)
         update.message.reply_text(getcalls(update.message.chat_id),parse_mode=ParseMode.HTML)
         return nextconversation(update)
-     except:
-         update.message.reply_text("Error")
+     except Exception as e:
+         update.message.reply_text("Error",e)
          return nextconversation(update)
 
-
-def getexpiry(month):
-    expiry=''
-    # TODO HARDCODED FOR EXPIRY will change, find a better way
-    if month:
-        if 'JAN'in month:
-            expiry=FUTURES[0]
-        elif 'FEB'in month:
-            expiry=FUTURES[1]
-        elif 'MAR'in month:
-            expiry=FUTURES[2]
-    return expiry
-
-
-def fetchquote(symbol):
-    symbolandexpiry=symbol.partition(' ')
-
-    expiry = getexpiry(symbolandexpiry[2])
-    response = quotefromnse.fetchquote(symbol=symbolandexpiry[0],expiry=expiry)
-    quote = response['data'][0]
-    pchange = quote.get('pChange','-')
-
-    openkey='open'
-    highkey='dayHigh'
-    lowkey='dayLow'
-    pclosekey='previousClose'
-    volumekey='totalTradedVolume'
-
-    if symbolandexpiry[2]:
-        openkey='openPrice'
-        highkey='highPrice'
-        lowkey='lowPrice'
-        pclosekey='prevClose'
-    #changedir=':arrow_down:' if pChange.startswith('-') else ':arrow_up:'
-    return '<b>'+symbol+'@'+quote['lastPrice']+'</b> ( '+pchange+'% )\n' \
-           + '<i>updated: ' + response.get('lastUpdateTime', '-') + '</i>\n\n' \
-           + 'o: '+quote[openkey]+ \
-            '\th: '+quote[highkey]+'\n' \
-            'l: '+quote[lowkey]+ \
-            '\tc: '+quote[pclosekey]+'\n\n' \
-            +'bestbid: '+quote['buyPrice1'] \
-            +' bestoffer: '+quote['sellPrice1']+'\n' \
-            +'buyqty: '+quote['totalBuyQuantity']\
-            +' sellqty: '+quote['totalSellQuantity']+'\n\n'\
 
 
 def error(bot, update, error):
@@ -251,14 +198,15 @@ def makecall(bot,update,user_data):
 
         quote=''
         try:
-            quote=fetchquote(symbol)
+            quote=data.fetchquote(symbol)
         except:
             errorreplytocall(update,INVALIDSYMBOL)
             return MAKECALL
 
-        dbhandler.createcall(symbol,callrange,misc,update.message.from_user.first_name,update.message.chat_id,update.message.from_user.id)
+        db.createcall(type,symbol, callrange, misc, update.message.from_user.first_name, str(update.message.chat_id),
+                      str(update.message.from_user.id))
         update.message.reply_text(text="Call made\n"+quote,parse_mode=ParseMode.HTML)
-        dbhandler.deleteoldcalls()
+        db.deleteoldcalls()
 
     except:
         print("Unexpected error:", sys.exc_info()[0])
@@ -293,62 +241,14 @@ def getusername(name):
     return name
 
 
-
-
 def deletecall(symbol,update):
     userid=update.message.from_user.id
     chatid=update.message.chat_id
-    rowcount=dbhandler.deletecall(symbol,userid,chatid)
+    rowcount=db.deletecall(symbol, userid, chatid)
     if rowcount>0:
         update.message.reply_text("Call for " + symbol + " deleted")
     else:
         update.message.reply_text("No calls for symbol "+symbol)
-
-
-
-updater=None
-def main():
-
-    dbhandler.initdb()
-
-    """Start the bot."""
-    # Create the EventHandler and pass it your bot's token.
-    global updater
-    #535372141:AAEgx8VtahWGWWUYhFcYR0zonqIHycRMXi0   - dev token
-    #534849104:AAHGnCHl4Q3u-PauqDZ1tspUdoWzH702QQc   - live token
-
-    updater = Updater("534849104:AAHGnCHl4Q3u-PauqDZ1tspUdoWzH702QQc")
-
-    # Get the dispatcher to register handlers
-    dp = updater.dispatcher
-
-
-
-
-    dp.add_handler(setupnewconvhandler())
-
-    dp.add_handler(CallbackQueryHandler(button))
-
-    # on noncommand i.e message - echo the message on Telegram
-   # dp.add_handler(MessageHandler(Filters.text, echo))
-
-    # log all errors
-    dp.add_error_handler(error)
-
-
-
-
-    print("Starting the bot...")
-
-    # Start the Bot
-    updater.start_polling()
-
-    startstreaming()
-
-    # Run the bot until you press Ctrl-C or the process receives SIGINT,
-    # SIGTERM or SIGABRT. This should be used most of the time, since
-    # start_polling() is non-blocking and will stop the bot gracefully.
-   # updater.idle()
 
 
 def query(bot, update):
@@ -361,7 +261,7 @@ def query(bot, update):
         return QUERY
 
 def alerts(bot,update):
-    replytxt=dbhandler.getalerts(str(update.message.chat_id))
+    replytxt=db.getalerts(str(update.message.chat_id))
     update.message.reply_text("Alerts:\n"+(replytxt if replytxt else 'None'))
     return nextconversation(update)
 
@@ -377,13 +277,13 @@ def alert(bot,update):
 
     price=commands[1].strip()
     symbol=commands[0].strip()
-    if symbol not in symbolmap.keys():
+    if symbol not in data.symbolmap.keys():
         update.message.reply_text(symbol+" not supported")
         return nextconversation(update)
 
     chat_id=update.message.chat_id
     update.message.reply_text('Alert set for '+symbol+" "+price)
-    dbhandler.createalert(symbol,operation,price,chat_id)
+    db.createalert(symbol, operation, price,str(chat_id))
     return nextconversation(update)
 
 
@@ -445,6 +345,9 @@ def setupnewconvhandler():
     )
     return conv_handler
 
+
+#TODO the updater is declared as global object, which may leeds to issues
+#Need to find best way to receive notifications without having this wolf reference
 def notifyalert(chatid,text):
     if updater and updater.bot:
         updater.bot.send_message(chat_id=chatid,text=text)
@@ -473,91 +376,47 @@ def setupconvhandler():
     return conv_handler
 
 
+updater=None
+def main():
+
+    db.initdb()
+
+    """Start the bot."""
+    # Create the EventHandler and pass it your bot's token.
+    global updater
+    #535372141:AAEgx8VtahWGWWUYhFcYR0zonqIHycRMXi0   - dev token
+    #534849104:AAHGnCHl4Q3u-PauqDZ1tspUdoWzH702QQc   - live token
+
+    updater = Updater("535372141:AAEgx8VtahWGWWUYhFcYR0zonqIHycRMXi0")
+
+    # Get the dispatcher to register handlers
+    dp = updater.dispatcher
+
+    dp.add_handler(setupnewconvhandler())
+
+    dp.add_handler(CallbackQueryHandler(button))
+
+    # on noncommand i.e message - echo the message on Telegram
+   # dp.add_handler(MessageHandler(Filters.text, echo))
+
+    # log all errors
+    dp.add_error_handler(error)
 
 
 
 
-kws = WebSocket(api_key="9oykkw4mc01lm5jf", public_token="V3mTjh6XbVQk3171IoWsn863qZsmBsDL", user_id="RT1384")
-alertslist=list()
+    print("Starting the bot...")
 
+    # Start the Bot
+    updater.start_polling()
 
+    data.startstreaming(notifyalert)
 
-# Callback for tick reception.
-def on_tick(ticks, ws):
-
-    for tick in ticks:
-        print(tick)
-        ltp=tick['last_price']
-        id=tick['instrument_token']
-        for alert in alertslist:
-            print(alert)
-            alertprice=alert[2]
-            text=''
-            alertid= symbolmap.get(alert[0])
-            if id==alertid:
-                if '>' == alert[1]:
-                    if ltp >= float(alertprice):
-                        text="Alert: price greater than "+alertprice+" ltp: "+str(ltp)+" for "+alert[0]
-                else:
-                    if tick[0]['last_price'] <= float(alertprice):
-                        text = "Alert: price lower than " + alertprice+" ltp: "+str(ltp)+" for "+alert[0]
-
-                if text:
-                    dbhandler.deletealert(alert[0],alert[3],alert[1])
-                    notifyalert(int(alert[3]),text)
-
-        # if tick[0]['last_price'] > alert[2]
-        #     print('hi')
-        # else:
-        #     print('hello')
-
-
-
-
-
-
-SUNTVJAN=12055042
-CGPOWERFEB=14649602
-CGPOWERJAN=11968258
-
-symbolmap={"CGPOWER JAN":CGPOWERJAN,"CGPOWER FEB":CGPOWERFEB,"SUNTV JAN":SUNTVJAN}
-
-# Callback for successful connection.
-def on_connect(ws):
-	# Subscribe to a list of instrument_tokens (RELIANCE and ACC here).
-	ws.subscribe([CGPOWERJAN,CGPOWERFEB,SUNTVJAN])
-
-	# Set RELIANCE to tick in `full` mode.
-	ws.set_mode(ws.MODE_LTP, [CGPOWERJAN,CGPOWERFEB,SUNTVJAN])
-
-
-
-
-def startstreaming():
-
-	# Assign the callbacks.
-	kws.on_tick = on_tick
-	kws.on_connect = on_connect
-	dbhandler.updatealerts()
-
-	# To enable auto reconnect WebSocket connection in case of network failure
-	# - First param is interval between reconnection attempts in seconds.
-	# Callback `on_reconnect` is triggered on every reconnection attempt. (Default interval is 5 seconds)
-	# - Second param is maximum number of retries before the program exits triggering `on_noreconnect` calback. (Defaults to 50 attempts)
-	# Note that you can also enable auto reconnection	 while initialising websocket.
-	# Example `kws = WebSocket("your_api_key", "your_public_token", "logged_in_user_id", reconnect=True, reconnect_interval=5, reconnect_tries=50)`
-	kws.enable_reconnect(reconnect_interval=5, reconnect_tries=50)
-
-	# Infinite loop on the main thread. Nothing after this will run.
-	# You have to use the pre-defined callbacks to manage subscriptions.
-	print('Starting streaming..')
-	kws.connect()
-
-def stop():
-	if kws:
-		kws.close()
-
-
+    # Run the bot until you press Ctrl-C or the process receives SIGINT,
+    # SIGTERM or SIGABRT. This should be used most of the time, since
+    # start_polling() is non-blocking and will stop the bot gracefully.
+    #updater.idle()
 
 if __name__ == '__main__':
     main()
+

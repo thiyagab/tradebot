@@ -1,3 +1,3 @@
-from bot import stockbot
+from bot import wolf
 
-stockbot.main()
+wolf.main()

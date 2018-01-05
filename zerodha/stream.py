@@ -1,7 +1,7 @@
 import sqlite3
 
 from kiteconnect import WebSocket
-from bot import stockbot
+from bot import wolf
 
 # Initialise.
 # paste the api and public token here
