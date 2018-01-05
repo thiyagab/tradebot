@@ -17,17 +17,15 @@ Press Ctrl-C on the command line or send a signal to the process to stop the
 bot.
 """
 
-from telegram.ext import Updater, CommandHandler, MessageHandler, Filters
 import logging
-from telegram import ParseMode,Chat
-from telegram.ext import (Updater, CommandHandler, MessageHandler, Filters, RegexHandler,
-                          ConversationHandler,CallbackQueryHandler)
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup
-
 import sys
-from bot import db,data
 
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+from telegram import ParseMode, Chat
+from telegram.ext import (Updater, CommandHandler, MessageHandler, Filters, RegexHandler,
+                          ConversationHandler, CallbackQueryHandler)
 
+from bot import db, data
 
 # Enable logging
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
@@ -35,27 +33,25 @@ logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s
 
 logger = logging.getLogger(__name__)
 
-MAKECALL, SYMBOL,QUERY = range(3)
-INVALIDSYNTAX,INVALIDSYMBOL,GENERALERROR = range(3)
+MAKECALL, SYMBOL, QUERY = range(3)
+INVALIDSYNTAX, INVALIDSYMBOL, GENERALERROR = range(3)
 VERSION = 'v0.0.4'
 
-HELPTXT= 'The wolf (' + VERSION + ') is here to help you with your stock queries\n\n' \
-         +'Ask me anything here /q\n' \
-         +'1.Give me a symbol, I will give you the quote\n' \
-         +"2.Say 'Buy infy@9000 sl@990', i will add it in calls\n" \
-         +"3.Say 'Calls', I will give you the last 4 calls in the group\n"
+HELPTXT = 'The wolf (' + VERSION + ') is here to help you with your stock queries\n\n' \
+          + 'Ask me anything here /q\n' \
+          + '1.Give me a symbol, I will give you the quote\n' \
+          + "2.Say 'Buy infy@9000 sl@990', i will add it in calls\n" \
+          + "3.Say 'Calls', I will give you the last 4 calls in the group\n"
 
-STARTCONV='How can I /help you?'
+STARTCONV = 'How can I /help you?'
 
-SYNTAX="Make a call in this format\n" \
-       "BUY|SELL 'symbol'@'pricerange' SL@'pricerange'\n" \
-       "e.g BUY INFY@1000-1005 SL@995\n"\
-        "For futures:\n"\
-        "e.g BUY CGPOWER.JAN@92\n"
+SYNTAX = "Make a call in this format\n" \
+         "BUY|SELL 'symbol'@'pricerange' SL@'pricerange'\n" \
+         "e.g BUY INFY@1000-1005 SL@995\n" \
+         "For futures:\n" \
+         "e.g BUY CGPOWER.JAN@92\n"
 
-errormsgs={INVALIDSYNTAX:"syntax oyunga kudra\n",INVALIDSYMBOL:"Symbol thappu.",GENERALERROR:"Unknown Error!"}
-
-
+errormsgs = {INVALIDSYNTAX: "syntax oyunga kudra\n", INVALIDSYMBOL: "Symbol thappu.", GENERALERROR: "Unknown Error!"}
 
 
 # Define a few command handlers. These usually take the two arguments bot and
@@ -82,10 +78,10 @@ def quote(bot, update):
         print(update.message.text)
         text = update.message.text
         if text.startswith("/q"):
-            parttext=text.partition(' ')
+            parttext = text.partition(' ')
             if parttext[2]:
                 symbol = parttext[2].upper()
-                return replyquote(symbol,update)
+                return replyquote(symbol, update)
             else:
                 if isgroup(update):
                     update.message.reply_text('nse symbol?\n(for futures, <symbol> <month>')
@@ -99,53 +95,54 @@ def quote(bot, update):
         update.message.reply_text("Invalid symbol or unknown error!")
         return nextconversation(update)
 
+
 def nextconversation(update):
     if isgroup(update):
         return ConversationHandler.END
     else:
         return QUERY
 
+
 def isgroup(update):
     type = update.effective_chat.type
     return (type == Chat.GROUP or type == Chat.SUPERGROUP)
 
 
-def replyquote(symbol,update,chat_id=None,message_id=None,bot=None):
-    #when called from refresh action, update object wont have chatid
+def replyquote(symbol, update, chat_id=None, message_id=None, bot=None):
+    # when called from refresh action, update object wont have chatid
     if update.message:
-        chat_id=update.message.chat_id
+        chat_id = update.message.chat_id
 
     message = data.fetchquote(symbol)
-    message+=getcalls(chat_id,symbol)
+    message += getcalls(chat_id, symbol)
 
     if isgroup(update):
-        message+="\n Make a /q"
-
+        message += "\n Make a /q"
 
     url = data.geturl(symbol)
-    keyboard = [[InlineKeyboardButton("Refresh", callback_data='3'+symbol),InlineKeyboardButton("More", url=url)],
-        [InlineKeyboardButton("Buy", callback_data='1'+symbol),
-                 InlineKeyboardButton("Sell", callback_data='2'+symbol)]]
+    keyboard = [[InlineKeyboardButton("Refresh", callback_data='3' + symbol), InlineKeyboardButton("More", url=url)],
+                [InlineKeyboardButton("Buy", callback_data='1' + symbol),
+                 InlineKeyboardButton("Sell", callback_data='2' + symbol)]]
 
     reply_markup = InlineKeyboardMarkup(keyboard)
     if bot:
         bot.edit_message_text(text=message,
                               chat_id=chat_id,
-                              message_id=message_id,parse_mode=ParseMode.HTML,reply_markup=reply_markup)
+                              message_id=message_id, parse_mode=ParseMode.HTML, reply_markup=reply_markup)
     else:
-        update.message.reply_text(text=message, parse_mode=ParseMode.HTML,reply_markup=reply_markup)
+        update.message.reply_text(text=message, parse_mode=ParseMode.HTML, reply_markup=reply_markup)
     return nextconversation(update)
 
-def getcalls(chat_id,symbol=None):
 
-    callstxt=db.getcalls(str(chat_id),symbol)
+def getcalls(chat_id, symbol=None):
+    callstxt = db.getcalls(str(chat_id), symbol)
 
     if callstxt:
-        callstxt="Calls Made:\n==========\n"+callstxt
+        callstxt = "Calls Made:\n==========\n" + callstxt
     else:
-        callstxt="No calls\n"
+        callstxt = "No calls\n"
 
-    callstxt+="==========\n"
+    callstxt += "==========\n"
 
     return callstxt
 
@@ -155,20 +152,20 @@ def button(bot, update):
     print(query.data)
     # Refresh and edit the same message
     if query.data.startswith('3'):
-        symbol=query.data[1:]
-        replyquote(symbol,update,chat_id=query.message.chat_id,message_id=query.message.message_id,bot=bot)
+        symbol = query.data[1:]
+        replyquote(symbol, update, chat_id=query.message.chat_id, message_id=query.message.message_id, bot=bot)
     else:
         query.message.reply_text("Not implemented yet")
 
-def calls(bot, update):
-     try:
-        print(update.message.text)
-        update.message.reply_text(getcalls(update.message.chat_id),parse_mode=ParseMode.HTML)
-        return nextconversation(update)
-     except Exception as e:
-         update.message.reply_text("Error",e)
-         return nextconversation(update)
 
+def calls(bot, update):
+    try:
+        print(update.message.text)
+        update.message.reply_text(getcalls(update.message.chat_id), parse_mode=ParseMode.HTML)
+        return nextconversation(update)
+    except Exception as e:
+        update.message.reply_text("Error", e)
+        return nextconversation(update)
 
 
 def error(bot, update, error):
@@ -180,149 +177,154 @@ def done(bot, update, user_data=None):
     update.message.reply_text("Happy trading")
     return nextconversation(update)
 
+
 def call(bot, update):
-    update.message.reply_text(SYNTAX,parse_mode=ParseMode.HTML)
+    update.message.reply_text(SYNTAX, parse_mode=ParseMode.HTML)
     return MAKECALL
 
 
-def makecall(bot,update,user_data):
+def makecall(bot, update, user_data):
     try:
-        text=update.message.text.upper()
+        text = update.message.text.upper()
         if text.startswith('SKIP'):
-            return done(bot,update,user_data)
+            return done(bot, update, user_data)
         if not validatecall(text):
-            errorreplytocall(update,INVALIDSYNTAX)
+            errorreplytocall(update, INVALIDSYNTAX)
             return MAKECALL
 
-        type,symbol,callrange,misc=tokenizecallquery(text)
+        type, symbol, callrange, misc = tokenizecallquery(text)
 
-        quote=''
+        quote = ''
         try:
-            quote=data.fetchquote(symbol)
+            quote = data.fetchquote(symbol)
         except:
-            errorreplytocall(update,INVALIDSYMBOL)
+            errorreplytocall(update, INVALIDSYMBOL)
             return MAKECALL
 
-        db.createcall(type,symbol, callrange, misc, update.message.from_user.first_name, str(update.message.chat_id),
+        db.createcall(type, symbol, callrange, misc, update.message.from_user.first_name, str(update.message.chat_id),
                       str(update.message.from_user.id))
-        update.message.reply_text(text="Call made\n"+quote,parse_mode=ParseMode.HTML)
+        update.message.reply_text(text="Call made\n" + quote, parse_mode=ParseMode.HTML)
         db.deleteoldcalls()
 
     except:
         print("Unexpected error:", sys.exc_info()[0])
-        errorreplytocall(update,GENERALERROR)
+        errorreplytocall(update, GENERALERROR)
 
     return nextconversation(update)
+
 
 def tokenizecallquery(text):
     tokens = text.partition(' ')
     type = tokens[0]
-    tokens=tokens[2].partition('@')
-    symbol=tokens[0].strip()
-    tokens=tokens[2].strip().partition(' ')
-    callrange=tokens[0].strip()
-    addtext=tokens[2]
-    return type, symbol, callrange,addtext
+    tokens = tokens[2].partition('@')
+    symbol = tokens[0].strip()
+    tokens = tokens[2].strip().partition(' ')
+    callrange = tokens[0].strip()
+    addtext = tokens[2]
+    return type, symbol, callrange, addtext
+
 
 def validatecall(text):
-    tarr= text.split(' ')
-    if not text.startswith('BUY') and not text.startswith('SELL') or\
+    tarr = text.split(' ')
+    if not text.startswith('BUY') and not text.startswith('SELL') or \
             len(text) > 50 or len(tarr) < 2 or '@' not in text:
         return False
 
     return True
 
-def errorreplytocall(update,errortype):
+
+def errorreplytocall(update, errortype):
     message = "Hi " + getusername(
-        update.message.from_user.first_name) + ",\n" + errormsgs[errortype]+"\nTry again or type 'skip' to cancel"
+        update.message.from_user.first_name) + ",\n" + errormsgs[errortype] + "\nTry again or type 'skip' to cancel"
     update.message.reply_text(text=message, parse_mode=ParseMode.HTML)
+
 
 def getusername(name):
     return name
 
 
-def deletecall(symbol,update):
-    userid=update.message.from_user.id
-    chatid=update.message.chat_id
-    rowcount=db.deletecall(symbol, userid, chatid)
-    if rowcount>0:
+def deletecall(symbol, update):
+    userid = update.message.from_user.id
+    chatid = update.message.chat_id
+    rowcount = db.deletecall(symbol, userid, chatid)
+    if rowcount > 0:
         update.message.reply_text("Call for " + symbol + " deleted")
     else:
-        update.message.reply_text("No calls for symbol "+symbol)
+        update.message.reply_text("No calls for symbol " + symbol)
 
 
 def query(bot, update):
-    command=update.message.text.upper().partition(' ')[2]
+    command = update.message.text.upper().partition(' ')[2]
     if command:
-        update.message.text=command
-        return processquery(bot,update,None)
+        update.message.text = command
+        return processquery(bot, update, None)
     else:
         update.message.reply_text(STARTCONV)
         return QUERY
 
-def alerts(bot,update):
-    replytxt=db.getalerts(str(update.message.chat_id))
-    update.message.reply_text("Alerts:\n"+(replytxt if replytxt else 'None'))
+
+def alerts(bot, update):
+    replytxt = db.getalerts(str(update.message.chat_id))
+    update.message.reply_text("Alerts:\n" + (replytxt if replytxt else 'None'))
     return nextconversation(update)
 
-def alert(bot,update):
-    commands=update.message.text.upper().partition(' ')[2]
-    #split(r'(>+|<+)')
-    if '>' in commands:
-        commands=commands.split('>')
-        operation='>'
-    elif '<' in commands:
-        commands=commands.split('<')
-        operation='<'
 
-    price=commands[1].strip()
-    symbol=commands[0].strip()
+def alert(bot, update):
+    commands = update.message.text.upper().partition(' ')[2]
+    # split(r'(>+|<+)')
+    if '>' in commands:
+        commands = commands.split('>')
+        operation = '>'
+    elif '<' in commands:
+        commands = commands.split('<')
+        operation = '<'
+
+    price = commands[1].strip()
+    symbol = commands[0].strip()
     if symbol not in data.symbolmap.keys():
-        update.message.reply_text(symbol+" not supported")
+        update.message.reply_text(symbol + " not supported")
         return nextconversation(update)
 
-    chat_id=update.message.chat_id
-    update.message.reply_text('Alert set for '+symbol+" "+price)
-    db.createalert(symbol, operation, price,str(chat_id))
+    chat_id = update.message.chat_id
+    update.message.reply_text('Alert set for ' + symbol + " " + price)
+    db.createalert(symbol, operation, price, str(chat_id))
     return nextconversation(update)
 
 
-def processquery(bot, update,user_data):
+def processquery(bot, update, user_data):
     print(update.message.text)
-    text=update.message.text.upper()
+    text = update.message.text.upper()
     try:
-        #query may contain commands again, so process the commands too
+        # query may contain commands again, so process the commands too
         if text.startswith('/'):
-            #ppl may use /q alerts or /q infy in private chat itself, lets process same as in group
+            # ppl may use /q alerts or /q infy in private chat itself, lets process same as in group
             if text.startswith('/Q '):
-                text=text[3:]
+                text = text[3:]
             else:
-                text=text[1:]
-        if text.startswith(('BUY','SELL','SHORT')):
-            return makecall(bot,update,user_data)
+                text = text[1:]
+        if text.startswith(('BUY', 'SELL', 'SHORT')):
+            return makecall(bot, update, user_data)
         elif text.startswith('CALLS'):
-            return calls(bot,update)
+            return calls(bot, update)
         elif text.startswith("HELP"):
-            return help(bot,update)
-        elif text=="Q":
-            return quote(bot,update)
+            return help(bot, update)
+        elif text == "Q":
+            return quote(bot, update)
         elif text.startswith('ALERTS'):
-            return alerts(bot,update)
+            return alerts(bot, update)
         elif text.startswith('DELETE'):
-            symbol=text.partition(' ')[2]
-            return deletecall(symbol,update)
+            symbol = text.partition(' ')[2]
+            return deletecall(symbol, update)
         elif text.startswith('ALERT'):
-            return alert(bot,update)
-        elif len(text) <50:
-            return quote(bot,update)
+            return alert(bot, update)
+        elif len(text) < 50:
+            return quote(bot, update)
         else:
             update.message.reply_text("Not ready to handle this query")
     except:
         update.message.reply_text("Error")
 
     return nextconversation(update)
-
-
 
 
 def setupnewconvhandler():
@@ -334,11 +336,11 @@ def setupnewconvhandler():
 
         states={
             QUERY: [MessageHandler(Filters.text,
-                                    processquery,
-                                    pass_user_data=True),
+                                   processquery,
+                                   pass_user_data=True),
 
-                    MessageHandler(Filters.command,processquery,pass_user_data=True)
-                     ]
+                    MessageHandler(Filters.command, processquery, pass_user_data=True)
+                    ]
         },
 
         fallbacks=[RegexHandler('^Done$', done, pass_user_data=True)]
@@ -346,11 +348,11 @@ def setupnewconvhandler():
     return conv_handler
 
 
-#TODO the updater is declared as global object, which may leeds to issues
-#Need to find best way to receive notifications without having this wolf reference
-def notifyalert(chatid,text):
+# TODO the updater is declared as global object, which may leeds to issues
+# Need to find best way to receive notifications without having this wolf reference
+def notifyalert(chatid, text):
     if updater and updater.bot:
-        updater.bot.send_message(chat_id=chatid,text=text)
+        updater.bot.send_message(chat_id=chatid, text=text)
 
 
 def setupconvhandler():
@@ -376,18 +378,19 @@ def setupconvhandler():
     return conv_handler
 
 
-updater=None
-def main():
+updater = None
 
+
+def main():
     db.initdb()
 
     """Start the bot."""
     # Create the EventHandler and pass it your bot's token.
     global updater
-    #535372141:AAEgx8VtahWGWWUYhFcYR0zonqIHycRMXi0   - dev token
-    #534849104:AAHGnCHl4Q3u-PauqDZ1tspUdoWzH702QQc   - live token
+    # 535372141:AAEgx8VtahWGWWUYhFcYR0zonqIHycRMXi0   - dev token
+    # 534849104:AAHGnCHl4Q3u-PauqDZ1tspUdoWzH702QQc   - live token
 
-    updater = Updater("535372141:AAEgx8VtahWGWWUYhFcYR0zonqIHycRMXi0")
+    updater = Updater("534849104:AAHGnCHl4Q3u-PauqDZ1tspUdoWzH702QQc")
 
     # Get the dispatcher to register handlers
     dp = updater.dispatcher
@@ -397,13 +400,10 @@ def main():
     dp.add_handler(CallbackQueryHandler(button))
 
     # on noncommand i.e message - echo the message on Telegram
-   # dp.add_handler(MessageHandler(Filters.text, echo))
+    # dp.add_handler(MessageHandler(Filters.text, echo))
 
     # log all errors
     dp.add_error_handler(error)
-
-
-
 
     print("Starting the bot...")
 
@@ -415,8 +415,8 @@ def main():
     # Run the bot until you press Ctrl-C or the process receives SIGINT,
     # SIGTERM or SIGABRT. This should be used most of the time, since
     # start_polling() is non-blocking and will stop the bot gracefully.
-    #updater.idle()
+    # updater.idle()
+
 
 if __name__ == '__main__':
     main()
-

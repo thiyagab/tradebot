@@ -6,10 +6,11 @@
 This program is dedicated to the public domain under the CC0 license.
 """
 
+import logging
+
 from telegram import (LabeledPrice, ShippingOption)
 from telegram.ext import (Updater, CommandHandler, MessageHandler,
                           Filters, PreCheckoutQueryHandler, ShippingQueryHandler)
-import logging
 
 # Enable logging
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',

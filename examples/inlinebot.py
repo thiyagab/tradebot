@@ -16,16 +16,13 @@ Basic inline bot example. Applies different text transformations.
 Press Ctrl-C on the command line or send a signal to the process to stop the
 bot.
 """
+import logging
 from uuid import uuid4
-
-import re
-
-from telegram.utils.helpers import escape_markdown
 
 from telegram import InlineQueryResultArticle, ParseMode, \
     InputTextMessageContent
 from telegram.ext import Updater, InlineQueryHandler, CommandHandler
-import logging
+from telegram.utils.helpers import escape_markdown
 
 # Enable logging
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',

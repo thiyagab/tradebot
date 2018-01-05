@@ -1,9 +1,9 @@
 import json
+
 import requests
 
 rsp = requests.get('https://finance.google.com/finance?q=NSE:CGPOWER&output=json')
 if rsp.status_code in (200,):
-
     # This magic here is to cut out various leading characters from the JSON
     # response, as well as trailing stuff (a terminating ']\n' sequence), and then
     # we decode the escape sequences in the response

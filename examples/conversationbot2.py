@@ -17,11 +17,11 @@ Press Ctrl-C on the command line or send a signal to the process to stop the
 bot.
 """
 
+import logging
+
 from telegram import ReplyKeyboardMarkup
 from telegram.ext import (Updater, CommandHandler, MessageHandler, Filters, RegexHandler,
                           ConversationHandler)
-
-import logging
 
 # Enable logging
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
@@ -80,7 +80,7 @@ def received_information(bot, update, user_data):
     update.message.reply_text("Neat! Just so you know, this is what you already told me:"
                               "{}"
                               "You can tell me more, or change your opinion on something.".format(
-                                  facts_to_str(user_data)), reply_markup=markup)
+        facts_to_str(user_data)), reply_markup=markup)
 
     return CHOOSING
 

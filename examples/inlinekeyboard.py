@@ -5,6 +5,7 @@
 # This program is dedicated to the public domain under the CC0 license.
 """
 import logging
+
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Updater, CommandHandler, CallbackQueryHandler
 

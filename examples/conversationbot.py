@@ -17,11 +17,11 @@ Press Ctrl-C on the command line or send a signal to the process to stop the
 bot.
 """
 
+import logging
+
 from telegram import (ReplyKeyboardMarkup, ReplyKeyboardRemove)
 from telegram.ext import (Updater, CommandHandler, MessageHandler, Filters, RegexHandler,
                           ConversationHandler)
-
-import logging
 
 # Enable logging
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
