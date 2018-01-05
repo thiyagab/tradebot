@@ -111,7 +111,7 @@ def on_tick(ticks, ws):
                     if ltp >= float(alertprice):
                         text = "Alert: price greater than " + alertprice + " ltp: " + str(ltp) + " for " + alert[0]
                 else:
-                    if tick[0]['last_price'] <= float(alertprice):
+                    if tick['last_price'] <= float(alertprice):
                         text = "Alert: price lower than " + alertprice + " ltp: " + str(ltp) + " for " + alert[0]
 
                 if text:
