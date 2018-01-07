@@ -83,7 +83,7 @@ def send_tweet(tweet):
         #     created_dt = created_dt.astimezone(tz)
         # created_at = created_dt.strftime('%Y-%m-%d %H:%M:%S %Z')
         fnnotifyalert(
-            chatid='@wolfupdates',
+            chatid='@stocktweets',
             text="""
 {link_preview}*{name}* ([@{screen_name}](https://twitter.com/{screen_name})) at {created_at}:
 {text}
@@ -97,7 +97,7 @@ def send_tweet(tweet):
                 created_at=tweet['created_at'],
                 tw_id=tweet['tw_id'],
             ),
-            disable_web_page_preview=True,
+            disable_web_page_preview=False,
             parse_mode=telegram.ParseMode.MARKDOWN)
 
     except TelegramError as e:
