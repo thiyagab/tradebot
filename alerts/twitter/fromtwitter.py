@@ -26,9 +26,10 @@ class StdOutListener(StreamListener):
 
     def on_status(self, status):
         """Called when a new status arrives"""
-        tweet = gettweet(status)
-        # print(tweet['user'])
-        send_tweet(tweet)
+        if not status.retweeted:
+            tweet = gettweet(status)
+            # print(tweet['user'])
+            send_tweet(tweet)
         return
 
 
@@ -97,7 +98,6 @@ def send_tweet(tweet):
                 created_at=tweet['created_at'],
                 tw_id=tweet['tw_id'],
             ),
-            disable_web_page_preview=False,
             parse_mode=telegram.ParseMode.MARKDOWN)
 
     except TelegramError as e:

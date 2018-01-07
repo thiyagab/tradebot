@@ -351,10 +351,9 @@ def setupnewconvhandler():
 
 # TODO the updater is declared as global object, which may leeds to issues
 # Need to find best way to receive notifications without having this wolf reference
-def notifyalert(chatid, text,disable_web_page_preview=None,parse_mode=None):
+def notifyalert(chatid, text,parse_mode=None):
     if updater and updater.bot:
         updater.bot.send_message(chat_id=chatid, text=text,
-                                 disable_web_page_preview=disable_web_page_preview,
                                  parse_mode=parse_mode)
 
 
