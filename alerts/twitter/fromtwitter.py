@@ -27,7 +27,7 @@ class StdOutListener(StreamListener):
     def on_status(self, status):
         """Called when a new status arrives"""
         tweet = gettweet(status)
-        print(tweet['user'])
+        # print(tweet['user'])
         send_tweet(tweet)
         return
 
@@ -107,6 +107,7 @@ fnnotifyalert = None
 def startstreaming(notifyalert=None):
     global fnnotifyalert
     fnnotifyalert = notifyalert
+    print('Listening to twitter..')
     l = StdOutListener()
     auth = OAuthHandler(consumer_key, consumer_secret)
     auth.set_access_token(access_token, access_token_secret)
