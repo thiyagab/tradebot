@@ -8,7 +8,7 @@ from kiteconnect import WebSocket
 dbname = "calls.db"
 
 kws = WebSocket(api_key="9oykkw4mc01lm5jf", public_token="V3mTjh6XbVQk3171IoWsn863qZsmBsDL", user_id="RT1384")
-
+#114968505
 
 # Callback for tick reception.
 def on_tick(tick, ws):

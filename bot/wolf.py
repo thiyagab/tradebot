@@ -26,6 +26,7 @@ from telegram.ext import (Updater, CommandHandler, MessageHandler, Filters, Rege
                           ConversationHandler, CallbackQueryHandler)
 
 from bot import db, data
+from alerts.twitter import fromtwitter
 
 # Enable logging
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
@@ -350,9 +351,12 @@ def setupnewconvhandler():
 
 # TODO the updater is declared as global object, which may leeds to issues
 # Need to find best way to receive notifications without having this wolf reference
-def notifyalert(chatid, text):
+def notifyalert(chatid, text,disable_web_page_preview=None,parse_mode=None):
     if updater and updater.bot:
-        updater.bot.send_message(chat_id=chatid, text=text)
+        updater.bot.send_message(chat_id=chatid, text=text,
+                                 disable_web_page_preview=disable_web_page_preview,
+                                 parse_mode=parse_mode)
+
 
 
 def setupconvhandler():
@@ -390,7 +394,8 @@ def main():
     # 535372141:AAEgx8VtahWGWWUYhFcYR0zonqIHycRMXi0   - dev token
     # 534849104:AAHGnCHl4Q3u-PauqDZ1tspUdoWzH702QQc   - live token
 
-    updater = Updater("534849104:AAHGnCHl4Q3u-PauqDZ1tspUdoWzH702QQc")
+    updater = Updater("535372141:AAEgx8VtahWGWWUYhFcYR0zonqIHycRMXi0")  #Dev
+    # updater = Updater("534849104:AAHGnCHl4Q3u-PauqDZ1tspUdoWzH702QQc")  # Live
 
     # Get the dispatcher to register handlers
     dp = updater.dispatcher
@@ -410,7 +415,10 @@ def main():
     # Start the Bot
     updater.start_polling()
 
+    fromtwitter.startstreaming(notifyalert)
+
     data.startstreaming(notifyalert)
+
 
     # Run the bot until you press Ctrl-C or the process receives SIGINT,
     # SIGTERM or SIGABRT. This should be used most of the time, since
