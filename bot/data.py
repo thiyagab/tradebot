@@ -98,11 +98,11 @@ def startstreaming(notifyalert):
 # Callback for tick reception.
 def on_tick(ticks, ws):
     for tick in ticks:
-        print(tick)
+        # print(tick)
         ltp = tick['last_price']
         id = tick['instrument_token']
         for alert in db.alertslist:
-            print(alert)
+            # print(alert)
             alertprice = alert[2]
             text = ''
             alertid = symbolmap.get(alert[0])

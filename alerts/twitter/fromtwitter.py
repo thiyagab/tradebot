@@ -60,7 +60,7 @@ def gettweet(tweet):
         #     tweet_text = tweet_text.replace(display_url, expanded_url)
 
         if hasattr(tweet,'extended_tweet'):
-            print('Extended text: ',tweet.extended_tweet["full_text"])
+            # print('Extended text: ',tweet.extended_tweet["full_text"])
             tweet_text=tweet.extended_tweet["full_text"]
 
         tw_data = {
