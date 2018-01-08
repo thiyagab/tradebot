@@ -2,6 +2,7 @@ import html
 import re
 
 import telegram
+from pytz import utc, timezone
 from telegram import TelegramError
 from tweepy.streaming import StreamListener
 from tweepy import OAuthHandler
@@ -26,34 +27,41 @@ class StdOutListener(StreamListener):
 
     def on_status(self, status):
         """Called when a new status arrives"""
-        if not status.retweeted:
+        # print(status)
+        if not hasattr(status, 'retweeted_status'):
             tweet = gettweet(status)
             # print(tweet['user'])
             send_tweet(tweet)
+        else:
+            print('Not sending.. ')
         return
 
 
 def gettweet(tweet):
         extensions = ('.jpg', '.jpeg', '.png', '.gif')
         pattern = '[(%s)]$' % ')('.join(extensions)
-        photo_url = ''
+        media_url = ''
         tweet_text = html.unescape(tweet.text)
         if 'media' in tweet.entities:
-            photo_url = tweet.entities['media'][0]['media_url_https']
+            media_url = tweet.entities['media'][0]['media_url_https']
         else:
             for url_entity in tweet.entities['urls']:
                 expanded_url = url_entity['expanded_url']
                 if re.search(pattern, expanded_url):
-                    photo_url = expanded_url
+                    media_url = expanded_url
                     break
         # if photo_url:
             #self.logger.debug("- - Found media URL in tweet: " + photo_url)
 
-        for url_entity in tweet.entities['urls']:
-            expanded_url = url_entity['expanded_url']
-            indices = url_entity['indices']
-            display_url = tweet.text[indices[0]:indices[1]]
-            tweet_text = tweet_text.replace(display_url, expanded_url)
+        # for url_entity in tweet.entities['urls']:
+        #     expanded_url = url_entity['expanded_url']
+        #     indices = url_entity['indices']
+        #     display_url = tweet.text[indices[0]:indices[1]]
+        #     tweet_text = tweet_text.replace(display_url, expanded_url)
+
+        if hasattr(tweet,'extended_tweet'):
+            print('Extended text: ',tweet.extended_tweet["full_text"])
+            tweet_text=tweet.extended_tweet["full_text"]
 
         tw_data = {
             'tw_id': tweet.id,
@@ -61,7 +69,7 @@ def gettweet(tweet):
             'created_at': tweet.created_at,
             'user': tweet.user.name,
             'screen_name':tweet.user.screen_name,
-            'photo_url': photo_url,
+            'media_url': media_url,
         }
         return tw_data
 
@@ -74,31 +82,32 @@ def send_tweet(tweet):
         Use a soft-hyphen to put an invisible link to the first
         image in the tweet, which will then be displayed as preview
         '''
-        photo_url = ''
-        if tweet['photo_url']:
-            photo_url = '[\xad](%s)' % tweet['photo_url']
+        media_url = ''
+        if tweet['media_url']:
+            photo_url = '[\xad](%s)' % tweet['media_url']
 
-        # created_dt = utc.localize(tweet['created_at'])
-        # if chat.timezone_name is not None:
-        #     tz = timezone(chat.timezone_name)
-        #     created_dt = created_dt.astimezone(tz)
-        # created_at = created_dt.strftime('%Y-%m-%d %H:%M:%S %Z')
-        fnnotifyalert(
-            chatid='@stocktweets',
-            text="""
-{link_preview}*{name}* ([@{screen_name}](https://twitter.com/{screen_name})) at {created_at}:
+        created_dt = utc.localize(tweet['created_at'])
+        tz = timezone('Asia/Kolkata')
+        created_dt = created_dt.astimezone(tz)
+        created_at = created_dt.strftime('%b %d %H:%M')
+        if fnnotifyalert:
+            fnnotifyalert(
+                chatid='@stocktweets',
+                text="""
+    {link_preview}*{name}* ([@{screen_name}](https://twitter.com/{screen_name})) at {created_at}
 {text}
--- [Link to this Tweet](https://twitter.com/{screen_name}/status/{tw_id})
-"""
-                .format(
-                link_preview=photo_url,
-                text=prepare_tweet_text(tweet['text']),
-                name=escape_markdown(tweet['user']),
-                screen_name=tweet['screen_name'],
-                created_at=tweet['created_at'],
-                tw_id=tweet['tw_id'],
-            ),
-            parse_mode=telegram.ParseMode.MARKDOWN)
+-- [Check in twitter](https://twitter.com/{screen_name}/status/{tw_id})
+    """
+                    .format(
+                    link_preview=media_url,
+                    text=prepare_tweet_text(tweet['text']),
+                    name=escape_markdown(tweet['user']),
+                    screen_name=tweet['screen_name'],
+                    created_at=created_at,
+                    tw_id=tweet['tw_id'],
+                ),
+                disable_web_page_preview=not media_url,
+                parse_mode=telegram.ParseMode.MARKDOWN)
 
     except TelegramError as e:
         print("Error",e)
@@ -121,6 +130,7 @@ def startstreaming(notifyalert=None):
 
     # This line filter tweets from the words.
     stream.filter(follow=['114968505','760853978837942272'], languages=['en'],async=True)
+    # stream.filter(track=['android'], languages=['en'], async=False)
 
 if __name__ == '__main__':
     # This handles Twitter authetification and the connection to Twitter Streaming API
