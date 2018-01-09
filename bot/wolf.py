@@ -76,7 +76,6 @@ def echo(bot, update):
 
 def quote(bot, update):
     try:
-        print(update.message.text)
         text = update.message.text
         if text.startswith("/q"):
             parttext = text.partition(' ')
@@ -150,7 +149,6 @@ def getcalls(chat_id, symbol=None):
 
 def button(bot, update):
     query = update.callback_query
-    print(query.data)
     # Refresh and edit the same message
     if query.data.startswith('3'):
         symbol = query.data[1:]
@@ -161,7 +159,6 @@ def button(bot, update):
 
 def calls(bot, update):
     try:
-        print(update.message.text)
         update.message.reply_text(getcalls(update.message.chat_id), parse_mode=ParseMode.HTML)
         return nextconversation(update)
     except Exception as e:
@@ -293,7 +290,7 @@ def alert(bot, update):
 
 
 def processquery(bot, update, user_data):
-    print(update.message.text)
+    logger.info("Query: "+update.message.text)
     text = update.message.text.upper()
     try:
         # query may contain commands again, so process the commands too
@@ -323,6 +320,7 @@ def processquery(bot, update, user_data):
         else:
             update.message.reply_text("Not ready to handle this query")
     except:
+        logger.error("Error processing query",sys.exc_info()[0])
         update.message.reply_text("Error")
 
     return nextconversation(update)
@@ -410,7 +408,7 @@ def main():
     # log all errors
     dp.add_error_handler(error)
 
-    print("Starting the bot...")
+    logger.info("Starting the bot...")
 
     # Start the Bot
     updater.start_polling()

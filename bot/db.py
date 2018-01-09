@@ -1,5 +1,6 @@
 import sqlite3
 from datetime import datetime
+from bot.util import logger
 
 DBNAME = "wolfca.db"
 
@@ -32,7 +33,7 @@ def deleteoldcalls():
 
 
 def deletealert(symbol, chatid, operation):
-    print('Deleting... ', symbol, chatid, operation)
+    logger.info('Deleting... ', symbol, chatid, operation)
     conn = sqlite3.connect(DBNAME)
     c = conn.cursor()
     c.execute(
@@ -43,7 +44,7 @@ def deletealert(symbol, chatid, operation):
 
 
 def deletecall(symbol, userid, chatid):
-    print('Deleting call... ', symbol, chatid)
+    logger.info('Deleting call... ', symbol, chatid)
     conn = sqlite3.connect(DBNAME)
     c = conn.cursor()
     c.execute(

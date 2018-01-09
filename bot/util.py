@@ -1,6 +1,12 @@
 from functools import wraps
 import re
+import logging
 
+# Enable logging
+logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+                    level=logging.INFO)
+
+logger = logging.getLogger(__name__)
 
 def with_touched_chat(f):
     @wraps(f)

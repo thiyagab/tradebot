@@ -1,6 +1,7 @@
 from kiteconnect import WebSocket
 
-from bot import db
+from bot import db,util
+from bot.util import logger
 from web import quotefromnse
 
 kws = WebSocket(api_key="9oykkw4mc01lm5jf", public_token="V3mTjh6XbVQk3171IoWsn863qZsmBsDL", user_id="RT1384")
@@ -91,7 +92,7 @@ def startstreaming(notifyalert):
     db.updatealerts()
 
     kws.enable_reconnect(reconnect_interval=5, reconnect_tries=50)
-    print('Starting streaming')
+    logger.info('Started streaming..')
     kws.connect()
 
 

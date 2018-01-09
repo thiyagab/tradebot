@@ -1,14 +1,11 @@
-import html
-import re
-
-import telegram
 from pytz import utc, timezone
 from telegram import TelegramError
 from tweepy.streaming import StreamListener
 from tweepy import OAuthHandler
-from tweepy import Stream,API
-from alerts.twitter.util import escape_markdown,prepare_tweet_text
-
+from tweepy import Stream
+from bot.util import escape_markdown,prepare_tweet_text
+from bot.util import logger
+import sys,telegram,html,re
 
 # Variables that contains yours credentials to access Twitter API
 access_token = "83812829-L0Myd620u1IPoNfD0hQMtsjotbYNN9TlQGr3GK2rA"
@@ -28,12 +25,16 @@ class StdOutListener(StreamListener):
     def on_status(self, status):
         """Called when a new status arrives"""
         # print(status)
-        if not hasattr(status, 'retweeted_status'):
-            tweet = gettweet(status)
-            # print(tweet['user'])
-            send_tweet(tweet)
-        else:
-            print('Not sending.. ')
+        try:
+            if not hasattr(status, 'retweeted_status') and not status.in_reply_to_status_id:
+                tweet = gettweet(status)
+                # print(tweet['user'])
+                send_tweet(tweet)
+            else:
+                logger.info('Not sending.. ')
+        except :
+            logger.error("Error handling status",sys.exc_info()[0])
+
         return
 
 
@@ -84,7 +85,7 @@ def send_tweet(tweet):
         '''
         media_url = ''
         if tweet['media_url']:
-            photo_url = '[\xad](%s)' % tweet['media_url']
+            media_url = '[\xad](%s)' % tweet['media_url']
 
         created_dt = utc.localize(tweet['created_at'])
         tz = timezone('Asia/Kolkata')
@@ -94,9 +95,10 @@ def send_tweet(tweet):
             fnnotifyalert(
                 chatid='@stocktweets',
                 text="""
-    {link_preview}*{name}* ([@{screen_name}](https://twitter.com/{screen_name})) at {created_at}
+    {link_preview}*{name}* ([@{screen_name}](https://twitter.com/{screen_name})) 
+{created_at}
+
 {text}
--- [Check in twitter](https://twitter.com/{screen_name}/status/{tw_id})
     """
                     .format(
                     link_preview=media_url,
@@ -104,24 +106,24 @@ def send_tweet(tweet):
                     name=escape_markdown(tweet['user']),
                     screen_name=tweet['screen_name'],
                     created_at=created_at,
-                    tw_id=tweet['tw_id'],
                 ),
                 disable_web_page_preview=not media_url,
                 parse_mode=telegram.ParseMode.MARKDOWN)
 
     except TelegramError as e:
-        print("Error",e)
+        logger.error("Error",e)
 
 fnnotifyalert = None
 def startstreaming(notifyalert=None):
     global fnnotifyalert
     fnnotifyalert = notifyalert
-    print('Listening to twitter..')
+    logger.info('Listening to twitter..')
     l = StdOutListener()
     auth = OAuthHandler(consumer_key, consumer_secret)
     auth.set_access_token(access_token, access_token_secret)
     # api = API(auth)
     #
+
     # users=api.lookup_users(screen_names=['in_tradingview','Brainandmoney'])
     # for user in users:
     #     print(user.id,user.name )
