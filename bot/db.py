@@ -50,7 +50,7 @@ def deletealert(symbol, chatid, operation):
 
 
 def deletecall(symbol, userid, chatid):
-    logger.info('Deleting call... ', symbol, chatid)
+    logger.info('Deleting call... '+ symbol)
     conn = sqlite3.connect(DBNAME)
     c = conn.cursor()
     c.execute(
@@ -79,7 +79,6 @@ def getalerts(chatid):
     replytxt = ''
     for row in c.execute(sqlstr):
         replytxt += formatalert(row) + "\n"
-        print(row)
     return replytxt
 
 
@@ -127,7 +126,6 @@ def getwatchlist(chatid):
     sqlstr = "SELECT * FROM calls where chatid='" + chatid + "' and type='"+WATCH_TYPE+"'"
     watchlist = list()
     for row in c.execute(sqlstr):
-        print(row)
         watchlist.append(row)
 
     return watchlist

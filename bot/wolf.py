@@ -192,29 +192,31 @@ def call(bot, update):
 
 def watchlist(bot, update):
     try:
-        watchlist=db.getwatchlist(update.message.chat_id)
+        watchlist=db.getwatchlist(str(update.message.chat_id))
         syslist=[row[3] for row in watchlist]
         names = [row[1] for row in watchlist]
-        stocklist=data.fetchquotelist(syslist,names)
-        displaytext=''
-
-        for stock,watch in zip(stocklist,watchlist):
-            user=watch[4]
-            sym=watch[1]
-            addedprice=watch[2]
-            ltp=stock.ltp
-            hi=stock.h
-            low=stock.l
-            displaytext+="Symbol:\t"+sym+\
-                +"Added By\t:"+user\
-                +"Added Price\t:"+addedprice\
-                +"LTP\t:"+ltp\
-                +"HIGH\t:"+hi\
-                +"LOW\t:"+low+"\n\n"
+        displaytext = ''
+        if len(watchlist)>0:
+            stocklist=data.fetchquotelist(syslist,names)
+            for stock,watch in zip(stocklist,watchlist):
+                user=watch[4]
+                sym=watch[1]
+                addedprice=watch[2]
+                ltp=stock.ltp
+                hi=stock.h
+                low=stock.l
+                displaytext+="<b>"+sym+"</b>"\
+                    +"<pre>"\
+                    +"\nAT    : "+addedprice\
+                    +"\nLTP   : "+ltp\
+                    +"\nHI    : "+hi\
+                    +"\nLO    : "+low\
+                    +"\nBY    : "+user\
+                    +"</pre>\n\n"
         if not displaytext:
             displaytext="Empty watchlist"
-        update.message.reply_text(displaytext)
-    except:
+        update.message.reply_text(displaytext,parse_mode=ParseMode.HTML)
+    except Exception as e:
         update.message.reply_text("Error in watchlist")
     return nextconversation(update)
 
@@ -230,7 +232,7 @@ def watch(bot,update,user_data=None):
             db.createcall(type=db.WATCH_TYPE,symbol=stock.sym,callrange=stock.ltp,
                           misc=stock.streamingsymbol,user=update.message.from_user.first_name,chatid=str(update.message.chat_id),
                           userid=str(update.message.from_user.id))
-            update.message.reply_text(text="Added to watchlist\n" + stock, parse_mode=ParseMode.HTML)
+            update.message.reply_text(text="Added to watchlist\n" + str(stock), parse_mode=ParseMode.HTML)
             db.deleteoldwatchlist()
         else:
             update.message.reply_text("Nothing to add")

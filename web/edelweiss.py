@@ -23,20 +23,19 @@ def getquote(sym):
 
 
 def getstreamingdata(syslist, names=None):
+    stocklist = list()
     if syslist and len(syslist) > 0:
         payload = {'syLst': syslist}
         response = requests.request("POST", "https://ewmw.edelweiss.in/api/trade/getquote", data=payload)
         response = json.loads(response.text)['syLst']
-        stocklist = list()
         for idx, quotejson in enumerate(response):
             name=names[idx]
             if quotejson['dpName']:
                 name = quotejson['dpName']
             stock = Stock(sym=name, ltp=quotejson['ltp'], h=quotejson['h'], l=quotejson['l'], o=quotejson['o'],
                           cp=quotejson['chgP'], c=quotejson['c'], ltt=quotejson['ltt'], streamingsymbol=quotejson['sym'])
-            print(stock.streamingsymbol)
             stocklist.append(stock)
-        return stocklist
+    return stocklist
 
 
 if __name__ == '__main__':
