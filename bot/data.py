@@ -2,7 +2,7 @@ from kiteconnect import WebSocket
 
 from bot import db,util
 from bot.util import logger
-from web import quotefromnse
+from web import quotefromnse,quotefromedelweiss
 
 kws = WebSocket(api_key="9oykkw4mc01lm5jf", public_token="V3mTjh6XbVQk3171IoWsn863qZsmBsDL", user_id="RT1384")
 
@@ -31,32 +31,9 @@ def fetchquote(symbol):
     symbolandexpiry = symbol.partition(' ')
 
     expiry = getexpiry(symbolandexpiry[2])
-    response = quotefromnse.fetchquote(symbol=symbolandexpiry[0], expiry=expiry)
-    quote = response['data'][0]
-    pchange = quote.get('pChange', '-')
-
-    openkey = 'open'
-    highkey = 'dayHigh'
-    lowkey = 'dayLow'
-    pclosekey = 'previousClose'
-    volumekey = 'totalTradedVolume'
-
-    if symbolandexpiry[2]:
-        openkey = 'openPrice'
-        highkey = 'highPrice'
-        lowkey = 'lowPrice'
-        pclosekey = 'prevClose'
-    # changedir=':arrow_down:' if pChange.startswith('-') else ':arrow_up:'
-    return '<b>' + symbol + '@' + quote['lastPrice'] + '</b> ( ' + pchange + '% )\n' \
-           + '<i>updated: ' + response.get('lastUpdateTime', '-') + '</i>\n\n' \
-           + 'o: ' + quote[openkey] + \
-           '\th: ' + quote[highkey] + '\n' \
-                                      'l: ' + quote[lowkey] + \
-           '\tc: ' + quote[pclosekey] + '\n\n' \
-           + 'bestbid: ' + quote['buyPrice1'] \
-           + ' bestoffer: ' + quote['sellPrice1'] + '\n' \
-           + 'buyqty: ' + quote['totalBuyQuantity'] \
-           + ' sellqty: ' + quote['totalSellQuantity'] + '\n\n' \
+    # stock = quotefromnse.fetchquote(symbol=symbolandexpiry[0], expiry=expiry)
+    stock = quotefromedelweiss.getquote(symbolandexpiry[0]+" "+expiry)
+    return str(stock)
 
 def getexpiry(month):
     expiry = ''

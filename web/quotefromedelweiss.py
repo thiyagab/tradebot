@@ -2,37 +2,39 @@ import json
 
 import requests
 import timeit
+from web.stock import Stock
 
 
 
-def getquote():
-    rsp = requests.get('https://ewmw.edelweiss.in/api/Market/Process/EquityDetailsMarketBySymbol/INFY')
+def getquote(sym):
+    rsp = requests.post('https://ewmw.edelweiss.in/ewreports/api/search/gsa/suggestions',{"SearchString":sym,"Cookie":""})
     if rsp.status_code in (200,):
         # This magic here is to cut out various leading characters from the JSON
         # response, as well as trailing stuff (a terminating ']\n' sequence), and then
         # we decode the escape sequences in the response
         # This then allows you to load the resulting string
         # with the JSON module.
-        print(rsp.text[1:-1])
-        fin_data = json.loads(rsp.content[4:-1].decode('unicode_escape'))
-        # print(fin_data)
-        print(len(fin_data))
-        # print out some quote data
-        print('Price:',fin_data['JsonData']['companyMarketPrice']['LTP'])
-# # print out some quote data
-# print('Price: {}'.format(fin_data['l']))
-# print('change percentage: {}'.format(fin_data['l']))
-# print('Opening Price: {}'.format(fin_data['op']))
-# print('Price/Earnings Ratio: {}'.format(fin_data['pe']))
-# print('52-week high: {}'.format(fin_data['hi52']))
-# print('52-week low: {}'.format(fin_data['lo52']))
+        respjson=json.loads(rsp.text)
+        if respjson and len(respjson)>0:
+            streamingsymbol=respjson[0]['NSEStreamingSymbol']
+            name=respjson[0]['suggestion']
+            if not streamingsymbol:
+                streamingsymbol=respjson[0]['BSEStreamingSymbol']
+            print(streamingsymbol)
+            return getstreamingdata(streamingsymbol,name)
 
 
-# rsp = requests.post("https://ewmw.edelweiss.in/api/Market/Process/GetDerivativeMultiSymbolDetails",
-#                     json=[{"schStr": "CGPOWER", "aTyp": "FUTSTK", "exp": ["25 Jan 2018"], "opTyp": ""}])
-#
-# fin_data = json.loads(rsp.text)
-# print(fin_data)
+def getstreamingdata(streamingsymbol,name=None):
+    if streamingsymbol and len(streamingsymbol) > 0:
+        payload = {'syLst': [streamingsymbol]}
+        response = requests.request("POST", "https://ewmw.edelweiss.in/api/trade/getquote", data=payload)
+        quotejson = json.loads(response.text)['syLst'][0]
+        if quotejson['dpName']:
+            name = quotejson['dpName']
+        stock = Stock(sym=name, ltp=quotejson['ltp'], h=quotejson['h'], l=quotejson['l'], o=quotejson['o'],
+                      cp=quotejson['chgP'], c=quotejson['c'], ltt=quotejson['ltt'])
+        print(stock)
+        return stock
 
 if __name__ == '__main__':
-    print(timeit.timeit("getquote()",globals=globals(),number=1))
+    print(timeit.timeit("getquote('suntv 25jan')",globals=globals(),number=1))

@@ -16,7 +16,7 @@ def getquote():
         # print(rsp.text)
         fin_data = json.loads(rsp.content[6:-2].decode('unicode_escape'))
         # print(fin_data)
-        print(len(fin_data))
+        print(len(rsp.text))
         # print out some quote data
         print('Price: {}'.format(fin_data['l']))
         # print('Change percentage: {}'.format(fin_data['cp']))
@@ -28,6 +28,6 @@ def getquote():
         # print('52-week low: {}'.format(fin_data['lo52']))
 
 if __name__ == '__main__':
-    print(timeit.timeit("getquote()",globals=globals(),number=1))
+    print(timeit.timeit("getquote()",globals=globals(),number=5))
 
 

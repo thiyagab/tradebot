@@ -8,9 +8,11 @@ Created on Tue Dec 19 08:57:58 2017
 import sys
 
 from web import common
+from web.stock import Stock
 
 
 def fetchquote(symbol, expiry=None):
+
     quoteurl = "https://www.nseindia.com/live_market/dynaContent/live_watch/get_quote/ajaxGetQuoteJSON.jsp"
     futquoteurl = "https://www.nseindia.com/live_market/dynaContent/live_watch/get_quote/ajaxFOGetQuoteJSON.jsp"
 
@@ -26,7 +28,28 @@ def fetchquote(symbol, expiry=None):
         url = quoteurl
 
     response = common.sendrequest(url=url, querystring=querystring)
-    return response
+    return getstock(response,symbol,expiry)
+
+def getstock(response,symbol,expiry=None):
+    quote = response['data'][0]
+    pchange = quote.get('pChange', '-')
+
+    openkey = 'open'
+    highkey = 'dayHigh'
+    lowkey = 'dayLow'
+    pclosekey = 'previousClose'
+    volumekey = 'totalTradedVolume'
+
+    if expiry:
+        openkey = 'openPrice'
+        highkey = 'highPrice'
+        lowkey = 'lowPrice'
+        pclosekey = 'prevClose'
+
+
+    stock = Stock(sym=symbol,ltp=quote['lastPrice'],o=quote[openkey],h=quote[highkey],
+                  l=quote[lowkey],c=quote[pclosekey],cp=pchange)
+    return stock
 
 
 def main():

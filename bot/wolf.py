@@ -36,7 +36,7 @@ logger = logging.getLogger(__name__)
 
 MAKECALL, SYMBOL, QUERY = range(3)
 INVALIDSYNTAX, INVALIDSYMBOL, GENERALERROR = range(3)
-VERSION = 'v0.0.4'
+VERSION = 'v0.0.5'
 
 HELPTXT = 'The wolf (' + VERSION + ') is here to help you with your stock queries\n\n' \
           + 'Ask me anything here /q\n' \
@@ -416,6 +416,8 @@ def main():
     fromtwitter.startstreaming(notifyalert)
 
     data.startstreaming(notifyalert)
+
+
 
 
     # Run the bot until you press Ctrl-C or the process receives SIGINT,
