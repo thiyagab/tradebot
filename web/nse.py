@@ -5,10 +5,12 @@ Created on Tue Dec 19 08:57:58 2017
 
 @author: thiyagab
 """
-import sys
+import sys,requests,lxml.html
+
 
 from web import common
 from web.stock import Stock
+
 
 
 def fetchquote(symbol, expiry=None):
@@ -52,6 +54,34 @@ def getstock(response,symbol,expiry=None):
     return stock
 
 
+def getactiveipo():
+    url="https://www.nseindia.com/products/content/equities/ipos/ipo_current.htm"
+    response=requests.request("GET", url)
+    parser = lxml.html.fromstring(response.text)
+    rowstag = parser.findall('tr')
+    formattedtext=''
+    if len(rowstag)>1:
+        for idx,row in enumerate(rowstag):
+            if idx>0:
+              tds= row.findall('td')
+              formattedtext+=formatipo(tds)
+
+    return formattedtext
+
+
+def formatipo(tds):
+    formattedtext=''
+    linktag=tds[0].getchildren()[0]
+    link="https://www.nseindia.com"+linktag.attrib['href']
+    formattedtext+='<a href="'+link+'">'+linktag.text+'</a>'
+    formattedtext+="\n<pre>Start: "
+    formattedtext+=tds[2].text
+    formattedtext += "\nEnd: "
+    formattedtext+=tds[3].text
+    formattedtext+="</pre>\n\n"
+    # print(formattedtext)
+    return formattedtext
+
 def main():
     if len(sys.argv) < 2:
         print("Usage: \n", "python quotefromnse <symbol>\n", "or\n", "python quotefromnse <symbol> <expiry>")
@@ -67,4 +97,5 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    # main()
+    getactiveipo()

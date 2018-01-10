@@ -36,7 +36,7 @@ logger = logging.getLogger(__name__)
 
 MAKECALL, SYMBOL, QUERY = range(3)
 INVALIDSYNTAX, INVALIDSYMBOL, GENERALERROR = range(3)
-VERSION = 'v0.0.5'
+VERSION = 'v0.0.6'
 
 HELPTXT = 'The wolf (' + VERSION + ') is here to help you with your stock queries\n\n' \
           + 'Ask me anything here /q\n' \
@@ -60,7 +60,7 @@ errormsgs = {INVALIDSYNTAX: "syntax oyunga kudra\n", INVALIDSYMBOL: "Symbol thap
 def start(bot, update):
     """Send a message when the command /start is issued."""
     update.message.reply_text(HELPTXT)
-    return nextconversation(update)
+    return QUERY
 
 
 def help(bot, update):
@@ -121,8 +121,9 @@ def replyquote(symbol, update, chat_id=None, message_id=None, bot=None):
 
     url = data.geturl(symbol)
     keyboard = [[InlineKeyboardButton("Refresh", callback_data='3' + symbol), InlineKeyboardButton("More", url=url)],
-                [InlineKeyboardButton("Buy", callback_data='1' + symbol),
-                 InlineKeyboardButton("Sell", callback_data='2' + symbol)]]
+                # [InlineKeyboardButton("Buy", callback_data='1' + symbol),
+                #  InlineKeyboardButton("Sell", callback_data='2' + symbol)]
+                ]
 
     reply_markup = InlineKeyboardMarkup(keyboard)
     if bot:
@@ -165,6 +166,13 @@ def calls(bot, update):
         update.message.reply_text("Error", e)
         return nextconversation(update)
 
+def ipo(bot, update):
+    try:
+        update.message.reply_text(data.getnseipo(), parse_mode=ParseMode.HTML)
+        return nextconversation(update)
+    except Exception as e:
+        update.message.reply_text("Error", e)
+        return nextconversation(update)
 
 def error(bot, update, error):
     """Log Errors caused by Updates."""
@@ -306,6 +314,8 @@ def processquery(bot, update, user_data):
             return calls(bot, update)
         elif text.startswith("HELP"):
             return help(bot, update)
+        elif text=="IPO":
+            return ipo(bot, update)
         elif text == "Q":
             return quote(bot, update)
         elif text.startswith('ALERTS'):
@@ -331,6 +341,7 @@ def setupnewconvhandler():
     conv_handler = ConversationHandler(
         entry_points=[CommandHandler('start', start), CommandHandler('q', query),
                       CommandHandler('help', help),
+                      CommandHandler('ipo', ipo),
                       CommandHandler('cancel', done)],
 
         states={
@@ -362,7 +373,8 @@ def setupconvhandler():
     conv_handler = ConversationHandler(
         entry_points=[CommandHandler('start', start), CommandHandler('quote', quote), CommandHandler('call', call),
                       CommandHandler('calls', calls),
-                      CommandHandler('done', done)],
+                      CommandHandler('done', done),
+                      CommandHandler('ipo', ipo)],
 
         states={
             SYMBOL: [MessageHandler(Filters.text,

@@ -2,7 +2,7 @@ from kiteconnect import WebSocket
 
 from bot import db,util
 from bot.util import logger
-from web import quotefromnse,quotefromedelweiss
+from web import nse,edelweiss
 
 kws = WebSocket(api_key="9oykkw4mc01lm5jf", public_token="V3mTjh6XbVQk3171IoWsn863qZsmBsDL", user_id="RT1384")
 
@@ -26,13 +26,19 @@ def geturl(symbol):
 
     return url
 
+def getnseipo():
+    ipo= nse.getactiveipo()
+    if not ipo:
+        ipo= "No Active IPOs"
+    return ipo
+
 
 def fetchquote(symbol):
     symbolandexpiry = symbol.partition(' ')
 
     expiry = getexpiry(symbolandexpiry[2])
     # stock = quotefromnse.fetchquote(symbol=symbolandexpiry[0], expiry=expiry)
-    stock = quotefromedelweiss.getquote(symbolandexpiry[0]+" "+expiry)
+    stock = edelweiss.getquote(symbolandexpiry[0] + " " + expiry)
     return str(stock)
 
 def getexpiry(month):

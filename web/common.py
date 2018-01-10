@@ -16,7 +16,7 @@ headers = {
     'Accept-Language': "en-US,en;q=0.9,ta-IN;q=0.8,ta;q=0.7",
     'User-Agent': "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_13_2) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/63.0.3239.108 Safari/537.36",
     'Accept': "*/*",
-    'Referer': "https://www.nseindia.com/live_market/dynaContent/live_watch/get_quote/GetQuote.jsp?",
+    #'Referer': "https://www.nseindia.com/live_market/dynaContent/live_watch/get_quote/GetQuote.jsp?",
     'X-Requested-With': "XMLHttpRequest",
     'Connection': "keep-alive",
     'Cache-Control': "no-cache",
@@ -25,11 +25,11 @@ headers = {
 
 def sendrequest(url, querystring):
     response = requests.request("GET", url, headers=headers, params=querystring)
-    return printresponse(response)
+    return parseresponse(response)
 
 
-def printresponse(response):
+def parseresponse(response):
     text = response.text.strip()
     jsonstr = json.loads(text)
-    print(jsonstr)
+    # print(jsonstr)
     return jsonstr
