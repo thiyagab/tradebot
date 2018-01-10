@@ -113,7 +113,7 @@ def replyquote(symbol, update, chat_id=None, message_id=None, bot=None):
     if update.message:
         chat_id = update.message.chat_id
 
-    message = data.fetchquote(symbol)
+    message = str(data.fetchquote(symbol))
     message += getcalls(chat_id, symbol)
 
     if isgroup(update):
@@ -189,6 +189,46 @@ def call(bot, update):
     return MAKECALL
 
 
+
+def watchlist(bot, update):
+    watchlist=db.getwatchlist(update.message.chat_id)
+    syslist=[row[3] for row in watchlist]
+    names = [row[1] for row in watchlist]
+    stocklist=data.fetchquotelist(syslist,names)
+    displaytext=''
+
+    for stock,watch in zip(stocklist,watchlist):
+        user=watch[4]
+        sym=watch[1]
+        addedprice=watch[2]
+        ltp=stock.ltp
+        hi=stock.h
+        low=stock.l
+        displaytext+="Symbol:\t"+sym+\
+            +"Added By\t:"+user\
+            +"Added Price\t:"+addedprice\
+            +"LTP\t:"+ltp\
+            +"HIGH\t:"+hi\
+            +"LOW\t:"+low+"\n\n"
+
+    update.message.reply_text(displaytext)
+    return nextconversation(update)
+
+
+
+def watch(bot,update,user_data=None):
+    text = update.message.text.upper()
+    tokens=text.partition(' ')
+    if tokens[2]:
+        stock=data.fetchquote(tokens[2])
+        # reusing the same calls db with type as watch and using the misc column for streaming symbol
+        db.createcall(type=db.WATCH_TYPE,symbol=stock.sym,callrange=stock.ltp,
+                      misc=stock.streamingsymbol,user=update.message.from_user.first_name,chatid=str(update.message.chat_id),
+                      userid=str(update.message.from_user.id))
+        update.message.reply_text(text="Added to watchlist\n" + stock, parse_mode=ParseMode.HTML)
+        db.deleteoldwatchlist()
+    return nextconversation(update)
+
 def makecall(bot, update, user_data):
     try:
         text = update.message.text.upper()
@@ -202,13 +242,13 @@ def makecall(bot, update, user_data):
 
         quote = ''
         try:
-            quote = data.fetchquote(symbol)
+            quote = str(data.fetchquote(symbol))
         except:
             errorreplytocall(update, INVALIDSYMBOL)
             return MAKECALL
 
-        db.createcall(type, symbol, callrange, misc, update.message.from_user.first_name, str(update.message.chat_id),
-                      str(update.message.from_user.id))
+        db.createcall(type=type,symbol= symbol,callrange= callrange,misc= misc, user=update.message.from_user.first_name, chatid=str(update.message.chat_id),
+                      userid=str(update.message.from_user.id))
         update.message.reply_text(text="Call made\n" + quote, parse_mode=ParseMode.HTML)
         db.deleteoldcalls()
 
@@ -314,6 +354,10 @@ def processquery(bot, update, user_data):
             return calls(bot, update)
         elif text.startswith("HELP"):
             return help(bot, update)
+        elif text=="WATCHLIST":
+            return watchlist(bot,update)
+        elif text.startswith("WATCH"):
+            return watch(bot,update)
         elif text=="IPO":
             return ipo(bot, update)
         elif text == "Q":
@@ -342,6 +386,7 @@ def setupnewconvhandler():
         entry_points=[CommandHandler('start', start), CommandHandler('q', query),
                       CommandHandler('help', help),
                       CommandHandler('ipo', ipo),
+                      CommandHandler('watchlist', watchlist),
                       CommandHandler('cancel', done)],
 
         states={

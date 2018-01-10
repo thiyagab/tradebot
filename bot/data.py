@@ -33,13 +33,18 @@ def getnseipo():
     return ipo
 
 
+
+def fetchquotelist(syslist,names):
+    return edelweiss.getstreamingdata(syslist,names)
+
+
 def fetchquote(symbol):
     symbolandexpiry = symbol.partition(' ')
 
     expiry = getexpiry(symbolandexpiry[2])
     # stock = quotefromnse.fetchquote(symbol=symbolandexpiry[0], expiry=expiry)
     stock = edelweiss.getquote(symbolandexpiry[0] + " " + expiry)
-    return str(stock)
+    return stock
 
 def getexpiry(month):
     expiry = ''

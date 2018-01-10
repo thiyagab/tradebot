@@ -1,5 +1,5 @@
 class Stock:
-    def __init__(self,sym,ltp='',o='',h='',l='',c='',cp='',ltt=''):
+    def __init__(self,sym,ltp='',o='',h='',l='',c='',cp='',ltt='',streamingsymbol=''):
         self.sym=sym
         self.ltp=ltp
         self.o = o
@@ -8,6 +8,7 @@ class Stock:
         self.c=c
         self.cp=cp
         self.ltt =ltt
+        self.streamingsymbol=streamingsymbol
 
     def __str__(self):
         try:

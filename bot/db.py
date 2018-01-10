@@ -7,7 +7,7 @@ DBNAME = "wolfca.db"
 # TODO this may not work with multiple threads updating and reading
 # from this list, need to find efficient way
 alertslist = list()
-
+WATCH_TYPE="WATCH"
 
 def initdb():
     conn = sqlite3.connect(DBNAME)
@@ -16,7 +16,7 @@ def initdb():
     c.execute('''CREATE TABLE IF NOT EXISTS calls
                  (type text, symbol text, callrange text, misc text, 
                  user text,chatid text,userid text,time timestamp,
-                 PRIMARY KEY (symbol,chatid,userid))''')
+                 PRIMARY KEY (type,symbol,chatid,userid))''')
 
     c.execute('''CREATE TABLE IF NOT EXISTS alerts
                  (symbol text,operation text, price text, chatid text,time timestamp,
@@ -27,10 +27,16 @@ def initdb():
 def deleteoldcalls():
     conn = sqlite3.connect(DBNAME)
     c = conn.cursor()
-    c.execute('delete from calls where time not in (select time from calls order by time desc limit 5)')
+    c.execute("delete from calls where type <> '"+WATCH_TYPE+"' and time not in (select time from calls order by time desc limit 5)")
     conn.commit()
     c.close()
 
+def deleteoldwatchlist():
+    conn = sqlite3.connect(DBNAME)
+    c = conn.cursor()
+    c.execute("delete from calls where type='"+WATCH_TYPE+"' and time not in (select time from calls order by time desc limit 5)")
+    conn.commit()
+    c.close()
 
 def deletealert(symbol, chatid, operation):
     logger.info('Deleting... ', symbol, chatid, operation)
@@ -115,7 +121,18 @@ def getcalls(chatid, symbol):
     return callstxt
 
 
-def createcall(type, symbol, callrange, misc, user, chatid, userid):
+def getwatchlist(chatid):
+    conn = sqlite3.connect(DBNAME, detect_types=sqlite3.PARSE_DECLTYPES)
+    c = conn.cursor()
+    sqlstr = "SELECT * FROM calls where chatid='" + chatid + "' and type='"+WATCH_TYPE+"'"
+    watchlist = list()
+    for row in c.execute(sqlstr):
+        print(row)
+        watchlist.append(row)
+
+    return watchlist
+
+def createcall(type, symbol, user, chatid, userid,callrange=None, misc=None,):
     sqlstr = '''INSERT OR REPLACE INTO calls VALUES (?,?,?,?,?,?,?,?)'''
     params = list()
     # (type text, symbol text, callrange text, slrange text, user text, chatid text, userid text
