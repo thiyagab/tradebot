@@ -210,7 +210,8 @@ def watchlist(bot, update):
             +"LTP\t:"+ltp\
             +"HIGH\t:"+hi\
             +"LOW\t:"+low+"\n\n"
-
+    if not displaytext:
+        displaytext="Empty watchlist"
     update.message.reply_text(displaytext)
     return nextconversation(update)
 
