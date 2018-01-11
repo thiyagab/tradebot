@@ -96,7 +96,6 @@ def send_tweet(tweet):
                 chatid='@stocktweets',
                 text="""
     {link_preview}*{name}* ([@{screen_name}](https://twitter.com/{screen_name})) 
-{created_at}
 
 {text}
     """
