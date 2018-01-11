@@ -11,15 +11,20 @@ def getquote(sym):
                         {"SearchString": sym, "Cookie": ""})
     if rsp.status_code in (200,):
         respjson = json.loads(rsp.text)
+
         if respjson and len(respjson) > 0:
-            streamingsymbol = respjson[0]['NSEStreamingSymbol']
-            name = respjson[0]['suggestion']
-            if not streamingsymbol:
-                streamingsymbol = respjson[0]['BSEStreamingSymbol']
-            #print(streamingsymbol)
-            stocklist = getstreamingdata([streamingsymbol], [name])
-            if len(stocklist) > 0:
-                return stocklist[0]
+            #TODO filter out options here, once we have a proper feed, these dirty code will be unnecessary
+            filteredlist=[x for x in respjson if not x['suggestion'].upper().endswith(('CE','PE'))]
+            if len(filteredlist)>0:
+                streamingsymbol = filteredlist[0]['NSEStreamingSymbol']
+
+                name = filteredlist[0]['suggestion']
+                if not streamingsymbol:
+                    streamingsymbol = filteredlist[0]['BSEStreamingSymbol']
+                #print(streamingsymbol)
+                stocklist = getstreamingdata([streamingsymbol], [name])
+                if len(stocklist) > 0:
+                    return stocklist[0]
 
 
 def getstreamingdata(syslist, names=None):
@@ -39,4 +44,4 @@ def getstreamingdata(syslist, names=None):
 
 
 if __name__ == '__main__':
-    print(timeit.timeit("getquote('nifty')", globals=globals(), number=1))
+    print(timeit.timeit("getquote('cgpower 25jan')", globals=globals(), number=1))
