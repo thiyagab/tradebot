@@ -107,13 +107,12 @@ def createalert(symbol, operation, price, chat_id):
 def getcalls(chatid, symbol):
     conn = sqlite3.connect(DBNAME, detect_types=sqlite3.PARSE_DECLTYPES)
     c = conn.cursor()
-    sqlstr = "SELECT * FROM calls where chatid='" + chatid + "'"
+    sqlstr = "SELECT * FROM calls where chatid='" + chatid + "' and type <> '"+WATCH_TYPE+"'"
     if symbol:
         sqlstr += "and symbol='" + symbol + "'"
 
     callstxt = ''
     for row in c.execute(sqlstr):
-        print(row)
         callstxt += row[4] + " : " + row[0] + " " + row[1] + "@" + row[2] + \
                     " " + row[3] + \
                     " on <i>" + row[7].strftime('%b %d %H:%M') + "</i>\n"
