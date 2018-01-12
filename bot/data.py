@@ -92,20 +92,20 @@ def on_tick(ticks, ws):
         id = tick['instrument_token']
         for alert in db.alertslist:
             # print(alert)
-            alertprice = alert[2]
+            alertprice = alert.price
             text = ''
-            alertid = symbolmap.get(alert[0])
+            alertid = symbolmap.get(alert.sym)
             if id == alertid:
-                if '>' == alert[1]:
+                if '>' == alert.op:
                     if ltp >= float(alertprice):
-                        text = "Alert: price greater than " + alertprice + " ltp: " + str(ltp) + " for " + alert[0]
+                        text = "Alert: price greater than " + alertprice + " ltp: " + str(ltp) + " for " + alert.sym
                 else:
                     if tick['last_price'] <= float(alertprice):
-                        text = "Alert: price lower than " + alertprice + " ltp: " + str(ltp) + " for " + alert[0]
+                        text = "Alert: price lower than " + alertprice + " ltp: " + str(ltp) + " for " + alert.sym
 
                 if text:
-                    db.deletealert(alert[0], alert[3], alert[1])
-                    fnnotifyalert(int(alert[3]), text)
+                    db.deletealert(alert.sym, alert.chatid, alert.op)
+                    fnnotifyalert(int(alert.chatid), text)
 
         # if tick[0]['last_price'] > alert[2]
         #     print('hi')

@@ -193,25 +193,23 @@ def call(bot, update):
 def watchlist(bot, update):
     try:
         watchlist=db.getwatchlist(str(update.message.chat_id))
-        syslist=[row[3] for row in watchlist]
-        names = [row[1] for row in watchlist]
+        syslist=[row.sym for row in watchlist]
+        names = [row.misc for row in watchlist]
         displaytext = ''
         if len(watchlist)>0:
             stocklist=data.fetchquotelist(syslist,names)
             for stock,watch in zip(stocklist,watchlist):
-                user=watch[4]
-                sym=watch[1]
-                addedprice=watch[2]
+                user=watch.user
+                sym=watch.sym
+                addedprice=watch.callrange
                 ltp=stock.ltp
                 hi=stock.h
                 low=stock.l
                 displaytext+="<b>"+sym+"</b>"\
                     +"<pre>"\
-                    +"\nAT    : "+addedprice\
-                    +"\nLTP   : "+ltp\
-                    +"\nHI    : "+hi\
-                    +"\nLO    : "+low\
-                    +"\nBY    : "+user\
+                    +"\nAT  : "+addedprice+"    LTP : "+ltp\
+                    +"\nHI  : "+hi+"    LO  : "+low\
+                    +"\nBY  : "+user\
                     +"</pre>\n\n"
         if not displaytext:
             displaytext="Empty watchlist"
@@ -460,8 +458,8 @@ def main():
     # 535372141:AAEgx8VtahWGWWUYhFcYR0zonqIHycRMXi0   - dev token
     # 534849104:AAHGnCHl4Q3u-PauqDZ1tspUdoWzH702QQc   - live token
 
-    # updater = Updater("535372141:AAEgx8VtahWGWWUYhFcYR0zonqIHycRMXi0")  #Dev
-    updater = Updater("534849104:AAHGnCHl4Q3u-PauqDZ1tspUdoWzH702QQc")  # Live
+    updater = Updater("535372141:AAEgx8VtahWGWWUYhFcYR0zonqIHycRMXi0")  #Dev
+    # updater = Updater("534849104:AAHGnCHl4Q3u-PauqDZ1tspUdoWzH702QQc")  # Live
 
     # Get the dispatcher to register handlers
     dp = updater.dispatcher
