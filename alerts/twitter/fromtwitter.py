@@ -130,7 +130,7 @@ def startstreaming(notifyalert=None):
     stream = Stream(auth, l)
 
     # This line filter tweets from the words.
-    stream.filter(follow=['114968505','760853978837942272'], languages=['en'],async=True)
+    stream.filter(follow=['114968505'], languages=['en'],async=True)
     # stream.filter(track=['android'], languages=['en'], async=False)
 
 if __name__ == '__main__':
