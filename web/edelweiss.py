@@ -24,6 +24,7 @@ def getquote(sym):
                 #print(streamingsymbol)
                 stocklist = getstreamingdata([streamingsymbol], [name])
                 if len(stocklist) > 0:
+                    print(str(stocklist[0]))
                     return stocklist[0]
 
 
@@ -44,4 +45,4 @@ def getstreamingdata(syslist, names=None):
 
 
 if __name__ == '__main__':
-    print(timeit.timeit("getquote('cgpower 25jan')", globals=globals(), number=1))
+    print(timeit.timeit("getquote('INFY')", globals=globals(), number=1))

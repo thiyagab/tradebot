@@ -1,75 +1,149 @@
-from bot.models import Calls,Alert
+import sqlite3
+from datetime import datetime
 from bot.util import logger
-from peewee import reduce,operator
 
+DBNAME = "wolfca.db"
+
+# TODO this may not work with multiple threads updating and reading
+# from this list, need to find efficient way
 alertslist = list()
 WATCH_TYPE="WATCH"
-LIMIT=5
-def deleteoldcalls():
-    calls=Calls.select(Calls.time).where(Calls.type!=WATCH_TYPE).order_by(Calls.time.desc()).limit(LIMIT)
-    Calls.delete().where((Calls.type!=WATCH_TYPE) & (Calls.time.not_in(calls))).execute()
 
+def initdb():
+    conn = sqlite3.connect(DBNAME)
+    c = conn.cursor()
+    # Create table
+    c.execute('''CREATE TABLE IF NOT EXISTS calls
+                 (type text, symbol text, callrange text, misc text, 
+                 user text,chatid text,userid text,time timestamp,
+                 PRIMARY KEY (type,symbol,chatid,userid))''')
+
+    c.execute('''CREATE TABLE IF NOT EXISTS alerts
+                 (symbol text,operation text, price text, chatid text,time timestamp,
+                 PRIMARY KEY (symbol,operation,chatid))''')
+    c.close()
+
+
+def deleteoldcalls():
+    conn = sqlite3.connect(DBNAME)
+    c = conn.cursor()
+    c.execute("delete from calls where type <> '"+WATCH_TYPE+"' and time not in (select time from calls order by time desc limit 5)")
+    conn.commit()
+    c.close()
 
 def deleteoldwatchlist():
-    calls = Calls.select(Calls.time).where(Calls.type == WATCH_TYPE).order_by(Calls.time.desc()).limit(LIMIT)
-    Calls.delete().where((Calls.type == WATCH_TYPE) & (Calls.time.not_in(calls))).execute()
+    conn = sqlite3.connect(DBNAME)
+    c = conn.cursor()
+    c.execute("delete from calls where type='"+WATCH_TYPE+"' and time not in (select time from calls order by time desc limit 5)")
+    conn.commit()
+    c.close()
 
 def deletealert(symbol, chatid, operation):
     logger.info('Deleting... ', symbol, chatid, operation)
-    Alert.delete().where((Alert.sym==symbol) and (Alert.op==operation) and (Alert.chatid==chatid)).execute()
+    conn = sqlite3.connect(DBNAME)
+    c = conn.cursor()
+    c.execute(
+        "delete from alerts where symbol='" + symbol + "' and operation='" + operation + "'" + " and chatid='" + chatid + "'")
+    conn.commit()
+    c.close()
     updatealerts()
 
 
 def deletecall(symbol, userid, chatid):
     logger.info('Deleting call... '+ symbol)
-    rowcount = Calls.delete().where(Calls.sym==symbol and Calls.userid==userid and Calls.chatid==chatid).execute()
+    conn = sqlite3.connect(DBNAME)
+    c = conn.cursor()
+    c.execute(
+        "delete from calls where symbol='" + symbol + "' and userid='" + str(userid) + "'" + " and chatid='" + str(
+            chatid) + "'")
+    rowcount = c.rowcount
+    conn.commit()
+    c.close()
     return rowcount
 
-#TODO this should be changed, obviously we cant stream multiple symbol to show alerts,
-#but still keeping the alerts in list is not efficient
-def updatealerts():
-    alertslist.clear()
-    for alert in Alert.select():
-        alertslist.append(alert)
 
+def updatealerts():
+    conn = sqlite3.connect(DBNAME)
+    c = conn.cursor()
+    sqlstr = "SELECT * FROM alerts"
+    alertslist.clear()
+    for row in c.execute(sqlstr):
+        alertslist.append(row)
+    c.close()
 
 
 def getalerts(chatid):
+    conn = sqlite3.connect(DBNAME, detect_types=sqlite3.PARSE_DECLTYPES)
+    c = conn.cursor()
+    sqlstr = "SELECT * FROM alerts where chatid='" + chatid + "'"
     replytxt = ''
-    for alert in Alert.select().where(Alert.chatid==chatid):
-        replytxt += formatalert(alert) + "\n"
+    for row in c.execute(sqlstr):
+        replytxt += formatalert(row) + "\n"
     return replytxt
 
 
-def formatalert(alert):
-    return alert.sym+ " " + alert.op + " " + alert.price
+def formatalert(row):
+    return row[0] + " " + row[1] + " " + row[2]
 
 
 def createalert(symbol, operation, price, chat_id):
-    Alert.insert(sym=symbol,op=operation,price=price,chatid=chat_id).upsert().execute()
+    sqlstr = '''INSERT OR REPLACE INTO alerts VALUES (?,?,?,?,?)'''
+    params = list()
+    # (symbol text,operation text, price text, chatid text,time timestamp
+    params.append(symbol)
+    params.append(operation)
+    params.append(price)
+    params.append(chat_id)
+    params.append(datetime.now())
+
+    conn = sqlite3.connect(DBNAME)
+    c = conn.cursor()
+    c.execute(sqlstr, params)
+    conn.commit()
+    c.close()
     updatealerts()
 
 
 def getcalls(chatid, symbol):
-    clauses=[(Calls.chatid==chatid),
-             (Calls.type!=WATCH_TYPE)]
+    conn = sqlite3.connect(DBNAME, detect_types=sqlite3.PARSE_DECLTYPES)
+    c = conn.cursor()
+    sqlstr = "SELECT * FROM calls where chatid='" + chatid + "' and type <> '"+WATCH_TYPE+"'"
     if symbol:
-        clauses.append((Calls.sym==symbol))
+        sqlstr += "and symbol='" + symbol + "'"
 
     callstxt = ''
-    for call in Calls.select().where(reduce(operator.and_,clauses)):
-        callstxt += call.user + " : " + call.type + " " + call.sym + "@" + call.callrange + \
-                    " " + call.desc + \
-                    " on <i>" + call.time.strftime('%b %d %H:%M') + "</i>\n"
+    for row in c.execute(sqlstr):
+        callstxt += row[4] + " : " + row[0] + " " + row[1] + "@" + row[2] + \
+                    " " + row[3] + \
+                    " on <i>" + row[7].strftime('%b %d %H:%M') + "</i>\n"
     return callstxt
 
 
 def getwatchlist(chatid):
+    conn = sqlite3.connect(DBNAME, detect_types=sqlite3.PARSE_DECLTYPES)
+    c = conn.cursor()
+    sqlstr = "SELECT * FROM calls where chatid='" + chatid + "' and type='"+WATCH_TYPE+"'"
     watchlist = list()
-    for call in Calls.select().where((Calls.chatid==chatid) and Calls.type==WATCH_TYPE):
-        watchlist.append(call)
+    for row in c.execute(sqlstr):
+        watchlist.append(row)
+
     return watchlist
 
 def createcall(type, symbol, user, chatid, userid,callrange=None, misc=None,):
-    Calls.insert(sym=symbol, type=type, callrange=callrange, chatid=chatid,user=user,userid=userid,misc=misc).upsert().execute()
+    sqlstr = '''INSERT OR REPLACE INTO calls VALUES (?,?,?,?,?,?,?,?)'''
+    params = list()
+    # (type text, symbol text, callrange text, slrange text, user text, chatid text, userid text
+    params.append(type)
+    params.append(symbol)
+    params.append(callrange)
+    params.append(misc)
+    params.append(user)
+    params.append(chatid)
+    params.append(userid)
+    params.append(datetime.now())
 
+    conn = sqlite3.connect(DBNAME)
+    c = conn.cursor()
+    c.execute(sqlstr, params)
+    conn.commit()
+    c.close()

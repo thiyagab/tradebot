@@ -197,7 +197,8 @@ def watchlist(bot, update):
         names = [row.misc for row in watchlist]
         displaytext = ''
         if len(watchlist)>0:
-            stocklist=data.fetchquotelist(syslist,names)
+            # TODO the syslist will be the names here, so swapping it, change to make better
+            stocklist=data.fetchquotelist(names,syslist)
             for stock,watch in zip(stocklist,watchlist):
                 user=watch.user
                 sym=watch.sym
@@ -227,9 +228,9 @@ def watch(bot,update,user_data=None):
         if tokens[2]:
             stock=data.fetchquote(tokens[2])
             # reusing the same calls db with type as watch and using the misc column for streaming symbol
-            db.createcall(type=db.WATCH_TYPE,symbol=stock.sym,callrange=stock.ltp,
-                          misc=stock.streamingsymbol,user=update.message.from_user.first_name,chatid=str(update.message.chat_id),
-                          userid=str(update.message.from_user.id))
+            db.createcall(type=db.WATCH_TYPE, symbol=stock.sym, callrange=stock.ltp,
+                           misc=stock.streamingsymbol, user=update.message.from_user.first_name, chatid=str(update.message.chat_id),
+                           userid=str(update.message.from_user.id))
             update.message.reply_text(text="Added to watchlist\n" + str(stock), parse_mode=ParseMode.HTML)
             db.deleteoldwatchlist()
         else:
@@ -256,8 +257,8 @@ def makecall(bot, update, user_data):
             errorreplytocall(update, INVALIDSYMBOL)
             return MAKECALL
 
-        db.createcall(type=type,symbol= symbol,callrange= callrange,misc= misc, user=update.message.from_user.first_name, chatid=str(update.message.chat_id),
-                      userid=str(update.message.from_user.id))
+        db.createcall(type=type, symbol= symbol, callrange= callrange, misc= misc, user=update.message.from_user.first_name, chatid=str(update.message.chat_id),
+                       userid=str(update.message.from_user.id))
         update.message.reply_text(text="Call made\n" + quote, parse_mode=ParseMode.HTML)
         db.deleteoldcalls()
 
@@ -450,6 +451,7 @@ updater = None
 
 
 def main():
+
     db.initdb()
 
     """Start the bot."""
@@ -458,8 +460,8 @@ def main():
     # 535372141:AAEgx8VtahWGWWUYhFcYR0zonqIHycRMXi0   - dev token
     # 534849104:AAHGnCHl4Q3u-PauqDZ1tspUdoWzH702QQc   - live token
 
-    updater = Updater("535372141:AAEgx8VtahWGWWUYhFcYR0zonqIHycRMXi0")  #Dev
-    # updater = Updater("534849104:AAHGnCHl4Q3u-PauqDZ1tspUdoWzH702QQc")  # Live
+    # updater = Updater("535372141:AAEgx8VtahWGWWUYhFcYR0zonqIHycRMXi0")  #Dev
+    updater = Updater("534849104:AAHGnCHl4Q3u-PauqDZ1tspUdoWzH702QQc")  # Live
 
     # Get the dispatcher to register handlers
     dp = updater.dispatcher

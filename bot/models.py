@@ -1,8 +1,10 @@
 from peewee import *
+from peewee import reduce,operator
 from playhouse.sqlite_ext import SqliteExtDatabase
 import datetime
 
-db = SqliteExtDatabase('test.db')
+
+db = SqliteExtDatabase('wolfca.db')
 
 class BaseModel(Model):
     class Meta:
@@ -22,8 +24,8 @@ class Calls(BaseModel):
     time=DateTimeField(default=datetime.datetime.now)
     misc=CharField(null=True)
 
-    def updateorreplace(self):
-        self.insert(self).upsert().execute()
+    # def updateorreplace(self):
+    #     self.insert(self).upsert().execute()
 
     class Meta:
         indexes = ((('sym', 'type','chatid'), True),)
@@ -43,6 +45,9 @@ class Alert(BaseModel):
     class Meta:
         indexes=((('sym','op','chatid'), True), )
 
+# db.connect()
+# db.create_tables([Alert,Calls],safe=True)
+
 def test():
     db.connect()
     db.create_tables([Alert,Calls],safe=True)
@@ -59,9 +64,9 @@ def test():
     # #
     # #
     # print(Alert.insert(sym='INFY').upsert().execute())
-    deleteoldcalls()
-    for call in Calls.select():
-        print(call.id,call.sym,call.type,call.callrange,call.time)
+    # deleteoldcalls()
+    # for call in Calls.select():
+    #     print(call.id,call.sym,call.type,call.callrange,call.time)
 
     # for call in Calls.select().where(Calls.type!='WATCH'):
     #     print(call.type,call.time)
@@ -71,6 +76,23 @@ def deleteoldcalls():
     calls=Calls.select(Calls.time).where(Calls.type!='WATCH').order_by(Calls.time.desc()).limit(2)
     print(Calls.delete().where((Calls.type!='WATCH') & (Calls.time.not_in(calls))).execute())
 
+
+def getcalls(chatid, symbol=None):
+    clauses=[(Calls.chatid==chatid),
+             (Calls.type!='WATCH')]
+    if symbol:
+        clauses.append((Calls.sym==symbol))
+
+    callstxt = ''
+
+    for call in Calls.select().where(reduce(operator.and_,clauses)):
+        print("Time: "+call.time.strftime('%b %d %H:%M'))
+        callstxt +=  call.type + " " + call.sym + "@" + call.callrange \
+                    +" on <i>" + call.time.strftime('%b %d %H:%M') + "</i>\n"
+    return callstxt
+
 if __name__ == '__main__':
-    test()
+    # test()
+    print(getcalls('12345'))
+    # deleteoldcalls()
 
