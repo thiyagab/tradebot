@@ -112,15 +112,18 @@ def replyquote(symbol, update, chat_id=None, message_id=None, bot=None):
     # when called from refresh action, update object wont have chatid
     if update.message:
         chat_id = update.message.chat_id
-
-    message = str(data.fetchquote(symbol))
+    stock =data.fetchquote(symbol)
+    if stock:
+        message = str(stock)
+    else:
+        message= "Couldnt find symbol. Try different query\n"
     message += getcalls(chat_id, symbol)
 
     if isgroup(update):
         message += "\n Make a /q"
 
-    url = data.geturl(symbol)
-    keyboard = [[InlineKeyboardButton("Refresh", callback_data='3' + symbol), InlineKeyboardButton("More", url=url)],
+    url = data.geturl(stock.sym)
+    keyboard = [[InlineKeyboardButton("Refresh", callback_data='3' + stock.sym), InlineKeyboardButton("More", url=url)],
                 # [InlineKeyboardButton("Buy", callback_data='1' + symbol),
                 #  InlineKeyboardButton("Sell", callback_data='2' + symbol)]
                 ]

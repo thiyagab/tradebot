@@ -1,5 +1,5 @@
 class Stock:
-    def __init__(self,sym,ltp='',o='',h='',l='',c='',cp='',ltt='',streamingsymbol=''):
+    def __init__(self, sym, ltp='', o='', h='', l='', c='', cp='', ltt='', name='', querysymbol=''):
         self.sym=sym
         self.ltp=ltp
         self.o = o
@@ -8,7 +8,8 @@ class Stock:
         self.c=c
         self.cp=cp
         self.ltt =ltt
-        self.streamingsymbol=streamingsymbol
+        self.name=name
+        self.querysymbol=querysymbol
 
     def __str__(self):
         try:
@@ -19,11 +20,11 @@ class Stock:
 
 
     def html(self):
-        return '<b>' + self.sym + ': ' + self.ltp + '</b> ( ' + self.cp + '% )\n' \
-               + '<pre>' + self.ltt + '\n\n' \
-               + 'o: ' + self.o + '\th: ' + self.h + '\n' \
-                                          'l: ' + self.l+ \
-               '\tc: ' +self.c + '</pre>\n\n' \
+        return '<b>' + self.name + '\n\n' \
+               +'LTP    :   '+self.ltp+'  ( '+self.cp+'% )</b>\n\n' \
+               +'<pre>' \
+               +'o  : '+self.o+'    h : '+self.h + '\n'\
+               +'l  : '+self.l+'    c : '+self.c + '</pre>\n\n' \
 
     def markup(self):
        return  """*{sym}: {ltp} ({cp}%)*

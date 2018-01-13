@@ -13,33 +13,37 @@ def getquote(sym):
         respjson = json.loads(rsp.text)
 
         if respjson and len(respjson) > 0:
-            #TODO filter out options here, once we have a proper feed, these dirty code will be unnecessary
-            filteredlist=[x for x in respjson if not x['suggestion'].upper().endswith(('CE','PE'))]
+
+            filteredlist=respjson
+            # TODO filter out options here, once we have a proper feed, these dirty code will be unnecessary
+                #[x for x in respjson if not x['suggestion'].upper().endswith(('CE','PE'))]
             if len(filteredlist)>0:
-                streamingsymbol = filteredlist[0]['NSEStreamingSymbol']
+                querysymbol = filteredlist[0]['NSEStreamingSymbol']
 
                 name = filteredlist[0]['suggestion']
-                if not streamingsymbol:
-                    streamingsymbol = filteredlist[0]['BSEStreamingSymbol']
+                sym=filteredlist[0]['nse_code']
+                if not querysymbol:
+                    querysymbol = filteredlist[0]['BSEStreamingSymbol']
                 #print(streamingsymbol)
-                stocklist = getstreamingdata([streamingsymbol], [name])
+                stocklist = getstreamingdata([querysymbol], [name],[sym])
                 if len(stocklist) > 0:
                     print(str(stocklist[0]))
                     return stocklist[0]
 
 
-def getstreamingdata(syslist, names=None):
+def getstreamingdata(querylist, names=None,symbols=None):
     stocklist = list()
-    if syslist and len(syslist) > 0:
-        payload = {'syLst': syslist}
+    if querylist and len(querylist) > 0:
+        payload = {'syLst': querylist}
         response = requests.request("POST", "https://ewmw.edelweiss.in/api/trade/getquote", data=payload)
         response = json.loads(response.text)['syLst']
         for idx, quotejson in enumerate(response):
             name=names[idx]
-            if quotejson['dpName']:
-                name = quotejson['dpName']
-            stock = Stock(sym=name, ltp=quotejson['ltp'], h=quotejson['h'], l=quotejson['l'], o=quotejson['o'],
-                          cp=quotejson['chgP'], c=quotejson['c'], ltt=quotejson['ltt'], streamingsymbol=quotejson['sym'])
+            sym=symbols[idx]
+            if not sym and quotejson['dpName']:
+                sym = quotejson['dpName']
+            stock = Stock(sym=sym, name=name, ltp=quotejson['ltp'], h=quotejson['h'], l=quotejson['l'], o=quotejson['o'],
+                          cp=quotejson['chgP'], c=quotejson['c'], ltt=quotejson['ltt'], querysymbol=quotejson['sym'])
             stocklist.append(stock)
     return stocklist
 

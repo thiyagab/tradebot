@@ -21,8 +21,8 @@ futureurl = 'https://www.nseindia.com/live_market/dynaContent/live_watch/get_quo
 def geturl(symbol):
     symbolandexpiry = symbol.partition(' ')
     url = equityurl + symbol
-    if symbolandexpiry[2]:
-        url = futureurl % (getexpiry(symbolandexpiry[2]), symbolandexpiry[0])
+    # if symbolandexpiry[2]:
+    #     url = futureurl % (getexpiry(symbolandexpiry[2]), symbolandexpiry[0])
 
     return url
 
@@ -43,7 +43,9 @@ def fetchquote(symbol):
 
     expiry = getexpiry(symbolandexpiry[2])
     # stock = quotefromnse.fetchquote(symbol=symbolandexpiry[0], expiry=expiry)
-    stock = edelweiss.getquote(symbolandexpiry[0] + " " + expiry)
+    # not supporting futures
+    stock = edelweiss.getquote(symbol)
+        # symbolandexpiry[0] + " " + expiry)
     return stock
 
 def getexpiry(month):
