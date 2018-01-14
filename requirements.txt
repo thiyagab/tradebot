@@ -2,4 +2,4 @@ tweepy
 html
 re
 lxml
-Feedparser
+feedparser
