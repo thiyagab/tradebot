@@ -22,7 +22,7 @@ def deletealert(symbol, chatid, operation):
 
 def deletecall(symbol, userid, chatid):
     logger.info('Deleting call... '+ symbol)
-    rowcount = Calls.delete().where(Calls.sym==symbol and Calls.userid==userid and Calls.chatid==chatid).execute()
+    rowcount = Calls.delete().where((Calls.sym==symbol) & (Calls.userid==userid) & (Calls.chatid==chatid)).execute()
     return rowcount
 
 #TODO this should be changed, obviously we cant stream multiple symbol to show alerts,
@@ -59,7 +59,7 @@ def getcalls(chatid, symbol=None):
     callstxt = ''
     for call in Calls.select().where(reduce(operator.and_,clauses)):
         callstxt += call.user + " : " + call.type + " " + call.sym + "@" + call.callrange + \
-                    " " +(call.desc if call.desc else "\n")+ \
+                    " " +(call.desc if call.desc else " ")+ \
                     " on <i>" + call.time.strftime('%b %d %H:%M') + "</i>\n"
     return callstxt
 
@@ -70,8 +70,8 @@ def getwatchlist(chatid):
         watchlist.append(call)
     return watchlist
 
-def createcall(type, symbol, user, chatid, userid,callrange=None, misc=None,):
-    Calls.insert(sym=symbol, type=type, callrange=callrange, chatid=chatid,user=user,userid=userid,misc=misc).upsert().execute()
+def createcall(type, symbol, user, chatid, userid,callrange=None, misc=None,desc=None):
+    Calls.insert(sym=symbol, type=type, callrange=callrange, chatid=chatid,user=user,userid=userid,misc=misc,desc=desc).upsert().execute()
 
 def initdb():
     db.connect()

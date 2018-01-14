@@ -37,7 +37,9 @@ def getstreamingdata(querylist, names=None,symbols=None):
         response = json.loads(response.text)['syLst']
         for idx, quotejson in enumerate(response):
             name=names[idx]
-            sym=symbols[idx]
+            sym=''
+            if symbols:
+                sym=symbols[idx]
             if not sym and quotejson['dpName']:
                 sym = quotejson['dpName']
             stock = Stock(sym=sym, name=name, ltp=quotejson['ltp'], h=quotejson['h'], l=quotejson['l'], o=quotejson['o'],

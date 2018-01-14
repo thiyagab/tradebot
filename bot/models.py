@@ -54,11 +54,11 @@ def test():
     alert = Alert(sym='INFY',type='BUY',price='1001')
     # alert.save(force_insert=False)
 
-    Calls.insert(sym='dsgdsg',type='BUY',callrange='1003',chatid='12345').upsert().execute()
-    Calls.insert(sym='watcc', type='BUY', callrange='1003', chatid='12345').upsert().execute()
-    Calls.insert(sym='watcccd', type='BUY', callrange='1003', chatid='12345').upsert().execute()
-    Calls.insert(sym='watcbin', type='BUY', callrange='1003', chatid='12345').upsert().execute()
-    Calls.insert(sym='watci', type='SELL', callrange='1003', chatid='12345').upsert().execute()
+    Calls.insert(sym='ASHAPUR',type='BUY',callrange='1003',chatid='12345',userid='123').upsert().execute()
+    Calls.insert(sym='INFY', type='BUY', callrange='1003', chatid='12345',userid='123').upsert().execute()
+    Calls.insert(sym='watcccd', type='BUY', callrange='1003', chatid='12345',userid='123').upsert().execute()
+    Calls.insert(sym='watcbin', type='BUY', callrange='1003', chatid='12345',userid='123').upsert().execute()
+    Calls.insert(sym='watci', type='SELL', callrange='1003', chatid='12345',userid='123').upsert().execute()
     #
     # Alert.insert
     # #
@@ -68,13 +68,17 @@ def test():
     # for call in Calls.select():
     #     print(call.id,call.sym,call.type,call.callrange,call.time)
 
-    # for call in Calls.select().where(Calls.type!='WATCH'):
-    #     print(call.type,call.time)
+    for call in Calls.select().where(Calls.type!='WATCH'):
+        print(call.sym,call.type,call.time)
     # print(Alert.get(Alert.sym=='INFY').price)
 
 def deleteoldcalls():
-    calls=Calls.select(Calls.time).where(Calls.type!='WATCH').order_by(Calls.time.desc()).limit(2)
-    print(Calls.delete().where((Calls.type!='WATCH') & (Calls.time.not_in(calls))).execute())
+    rowcount = Calls.delete().where(
+        (Calls.sym == 'INFY') & (Calls.userid == '123') & (Calls.chatid == '12345')).execute()
+    print(rowcount)
+    for call in Calls.select():
+        print(call.sym, call.type, call.time)
+
 
 
 def getcalls(chatid, symbol=None):
@@ -93,6 +97,6 @@ def getcalls(chatid, symbol=None):
 
 if __name__ == '__main__':
     # test()
-    print(getcalls('12345'))
-    # deleteoldcalls()
+    # print(getcalls('12345'))
+    deleteoldcalls()
 
