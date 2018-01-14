@@ -26,6 +26,7 @@ from telegram.ext import (Updater, CommandHandler, MessageHandler, Filters, Rege
                           ConversationHandler, CallbackQueryHandler)
 
 from bot import db, data
+from bot.schedulers import Scheduler
 from alerts.twitter import fromtwitter
 
 # Enable logging
@@ -123,7 +124,7 @@ def replyquote(symbol, update, chat_id=None, message_id=None, bot=None):
         message += "\n Make a /q"
 
     url = data.geturl(stock.sym)
-    keyboard = [[InlineKeyboardButton("Refresh", callback_data='3' + stock.sym), InlineKeyboardButton("More", url=url)],
+    keyboard = [[InlineKeyboardButton("Refresh", callback_data='3' + stock.querysymbol), InlineKeyboardButton("More", url=url)],
                 # [InlineKeyboardButton("Buy", callback_data='1' + symbol),
                 #  InlineKeyboardButton("Sell", callback_data='2' + symbol)]
                 ]
@@ -232,13 +233,13 @@ def watch(bot,update,user_data=None):
             stock=data.fetchquote(tokens[2])
             # reusing the same calls db with type as watch and using the misc column for streaming symbol
             db.createcall(type=db.WATCH_TYPE, symbol=stock.sym, callrange=stock.ltp,
-                           misc=stock.streamingsymbol, user=update.message.from_user.first_name, chatid=str(update.message.chat_id),
+                           misc=stock.querysymbol, user=update.message.from_user.first_name, chatid=str(update.message.chat_id),
                            userid=str(update.message.from_user.id))
             update.message.reply_text(text="Added to watchlist\n" + str(stock), parse_mode=ParseMode.HTML)
             db.deleteoldwatchlist()
         else:
             update.message.reply_text("Nothing to add")
-    except:
+    except Exception as e:
         update.message.reply_text("Error adding to watchlist")
     return nextconversation(update)
 
@@ -452,6 +453,8 @@ def setupconvhandler():
 
 updater = None
 
+#def schedulejobs():
+    # updater.
 
 def main():
 
@@ -483,6 +486,8 @@ def main():
 
     # Start the Bot
     updater.start_polling()
+    scheduler = Scheduler(bot=updater.bot)
+    updater.job_queue.run_repeating(callback=scheduler.ipos,interval=12*60*60)
 
     fromtwitter.startstreaming(notifyalert)
 

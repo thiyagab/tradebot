@@ -13,10 +13,8 @@ def getquote(sym):
         respjson = json.loads(rsp.text)
 
         if respjson and len(respjson) > 0:
-
-            filteredlist=respjson
             # TODO filter out options here, once we have a proper feed, these dirty code will be unnecessary
-                #[x for x in respjson if not x['suggestion'].upper().endswith(('CE','PE'))]
+            filteredlist=[x for x in respjson if not x['suggestion'].upper().endswith(('CE','PE'))]
             if len(filteredlist)>0:
                 querysymbol = filteredlist[0]['NSEStreamingSymbol']
 
@@ -48,5 +46,29 @@ def getstreamingdata(querylist, names=None,symbols=None):
     return stocklist
 
 
+def getevents():
+    import requests
+
+    url = "https://ewmw.edelweiss.in/api/Market/MarketsModule/Events"
+
+    payload = "{\"dt\":\"2018-01-16\"}"
+    headers = {
+        'Origin': "https://www.edelweiss.in",
+        'Accept-Encoding': "gzip, deflate, br",
+        'Accept-Language': "en-US,en;q=0.9,ta-IN;q=0.8,ta;q=0.7",
+        'User-Agent': "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_13_2) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/63.0.3239.132 Safari/537.36",
+        'Content-Type': "application/json;charset=UTF-8",
+        'Accept': "application/json, text/plain, */*",
+        'Referer': "https://www.edelweiss.in/market/economic-and-company-events",
+        'Connection': "keep-alive",
+        'Cache-Control': "no-cache",
+        'Postman-Token': "1b85f3cd-a7b9-59c4-9b6b-8d7f18e7af4b"
+    }
+
+    response = requests.request("POST", url, data=payload, headers=headers)
+
+    print(json.loads(response.text))
+
 if __name__ == '__main__':
-    print(timeit.timeit("getquote('INFY')", globals=globals(), number=1))
+    #print(timeit.timeit("getquote('INFY')", globals=globals(), number=1))
+    getevents()
