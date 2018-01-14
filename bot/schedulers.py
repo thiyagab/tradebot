@@ -1,9 +1,7 @@
+from web import nse
+from bot import db
 
-class Scheduler:
+def ipos(bot,job):
+    ipodetails=nse.getactiveipo()
+    db.insertipos(ipodetails)
 
-    def __init__(self,bot):
-        self.bot=bot
-
-    def ipos(self):
-        print('ipos')
-        self.bot.send_message('hi')

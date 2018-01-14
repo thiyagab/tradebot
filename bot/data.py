@@ -27,10 +27,14 @@ def geturl(symbol):
     return url
 
 def getnseipo():
-    ipo= nse.getactiveipo()
-    if not ipo:
-        ipo= "No Active IPOs"
-    return ipo
+    ipos= db.getipos()
+    formattedtext=''
+    for ipodetail in ipos:
+        formattedtext+=nse.formatipo(ipodetail)
+
+    if not formattedtext:
+        formattedtext="No IPOs"
+    return formattedtext
 
 
 

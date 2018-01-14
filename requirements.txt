@@ -3,3 +3,5 @@ python-telegram-bot
 tweepy
 lxml
 feedparser
+tinydb
+ujson

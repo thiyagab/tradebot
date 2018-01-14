@@ -1,10 +1,14 @@
 from bot.models import Calls,Alert,db
 from bot.util import logger
 from peewee import reduce,operator
+from tinydb import TinyDB,JSONStorage
 
 alertslist = list()
 WATCH_TYPE="WATCH"
 LIMIT=5
+
+tdb=TinyDB('store.json',storage=JSONStorage)
+
 def deleteoldcalls():
     calls=Calls.select(Calls.time).where(Calls.type!=WATCH_TYPE).order_by(Calls.time.desc()).limit(LIMIT)
     Calls.delete().where((Calls.type!=WATCH_TYPE) & (Calls.time.not_in(calls))).execute()
@@ -72,6 +76,16 @@ def getwatchlist(chatid):
 
 def createcall(type, symbol, user, chatid, userid,callrange=None, misc=None,desc=None):
     Calls.insert(sym=symbol, type=type, callrange=callrange, chatid=chatid,user=user,userid=userid,misc=misc,desc=desc).upsert().execute()
+
+
+def insertipos(ipos):
+    tdb.purge_table('ipos')
+    ipotable = tdb.table('ipos')
+    ipotable.insert_multiple(ipos)
+
+def getipos():
+    ipotable = tdb.table('ipos')
+    return ipotable.all()
 
 def initdb():
     db.connect()

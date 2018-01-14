@@ -59,25 +59,37 @@ def getactiveipo():
     response=requests.request("GET", url)
     parser = lxml.html.fromstring(response.text)
     rowstag = parser.findall('tr')
-    formattedtext=''
+    ipodetailsjson=[]
     if len(rowstag)>1:
+
         for idx,row in enumerate(rowstag):
             if idx>0:
               tds= row.findall('td')
-              formattedtext+=formatipo(tds)
+              ipodetailsjson.append(ipodetails(tds))
+    # ipos={'ipos':ipodetails}
+    return ipodetailsjson
 
-    return formattedtext
 
+def ipodetails(tds):
+    ipodetail = {}
+    linktag = tds[0].getchildren()[0]
+    link = "https://www.nseindia.com" + linktag.attrib['href']
+    ipodetail['link'] = link
+    ipodetail['name'] = linktag.text
+    ipodetail['start'] = tds[2].text
+    ipodetail['end'] = tds[3].text
+    # print(formattedtext)
+    return ipodetail
 
-def formatipo(tds):
+def formatipo(ipodetail):
     formattedtext=''
-    linktag=tds[0].getchildren()[0]
-    link="https://www.nseindia.com"+linktag.attrib['href']
-    formattedtext+='<a href="'+link+'">'+linktag.text+'</a>'
+    linktag=ipodetail['name']
+    link=ipodetail['link']
+    formattedtext+='<a href="'+link+'">'+linktag+'</a>'
     formattedtext+="\n<pre>Start: "
-    formattedtext+=tds[2].text
+    formattedtext+=ipodetail['start']
     formattedtext += "\nEnd: "
-    formattedtext+=tds[3].text
+    formattedtext+=ipodetail['end']
     formattedtext+="</pre>\n\n"
     # print(formattedtext)
     return formattedtext

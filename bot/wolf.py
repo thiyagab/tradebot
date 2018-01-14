@@ -20,13 +20,13 @@ bot.
 import logging
 import sys
 
+import datetime
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 from telegram import ParseMode, Chat
 from telegram.ext import (Updater, CommandHandler, MessageHandler, Filters, RegexHandler,
                           ConversationHandler, CallbackQueryHandler)
 
-from bot import db, data
-from bot.schedulers import Scheduler
+from bot import db, data,schedulers
 from alerts.twitter import fromtwitter
 
 # Enable logging
@@ -486,8 +486,8 @@ def main():
 
     # Start the Bot
     updater.start_polling()
-    scheduler = Scheduler(bot=updater.bot)
-    updater.job_queue.run_repeating(callback=scheduler.ipos,interval=12*60*60)
+
+    updater.job_queue.run_repeating(callback=schedulers.ipos,interval=12*60*60,first=datetime.datetime.now())
 
     fromtwitter.startstreaming(notifyalert)
 
