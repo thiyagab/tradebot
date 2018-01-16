@@ -1,7 +1,8 @@
-import json
+import ujson
 import timeit
 
 import requests
+import datetime
 
 from web.stock import Stock
 
@@ -10,7 +11,7 @@ def getquote(sym):
     rsp = requests.post('https://ewmw.edelweiss.in/ewreports/api/search/gsa/suggestions',
                         {"SearchString": sym, "Cookie": ""})
     if rsp.status_code in (200,):
-        respjson = json.loads(rsp.text)
+        respjson = ujson.loads(rsp.text)
 
         if respjson and len(respjson) > 0:
             # TODO filter out options here, once we have a proper feed, these dirty code will be unnecessary
@@ -34,7 +35,7 @@ def getstreamingdata(querylist, names=None,symbols=None):
     if querylist and len(querylist) > 0:
         payload = {'syLst': querylist}
         response = requests.request("POST", "https://ewmw.edelweiss.in/api/trade/getquote", data=payload)
-        response = json.loads(response.text)['syLst']
+        response = ujson.loads(response.text)['syLst']
         for idx, quotejson in enumerate(response):
             name=names[idx]
             sym=''
@@ -49,27 +50,22 @@ def getstreamingdata(querylist, names=None,symbols=None):
 
 
 def getevents():
-    import requests
-
     url = "https://ewmw.edelweiss.in/api/Market/MarketsModule/Events"
+    time=datetime.datetime.now()
+    # if the market is closed, then get results for next day
+    if time.hour>15 and time.minute>0:
+        time=time.replace(day=time.day+1)
 
-    payload = "{\"dt\":\"2018-01-16\"}"
+    date=time.strftime('%Y-%m-%d')
+    payload = {"dt":date}
     headers = {
-        'Origin': "https://www.edelweiss.in",
-        'Accept-Encoding': "gzip, deflate, br",
-        'Accept-Language': "en-US,en;q=0.9,ta-IN;q=0.8,ta;q=0.7",
         'User-Agent': "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_13_2) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/63.0.3239.132 Safari/537.36",
         'Content-Type': "application/json;charset=UTF-8",
-        'Accept': "application/json, text/plain, */*",
-        'Referer': "https://www.edelweiss.in/market/economic-and-company-events",
-        'Connection': "keep-alive",
-        'Cache-Control': "no-cache",
-        'Postman-Token': "1b85f3cd-a7b9-59c4-9b6b-8d7f18e7af4b"
     }
 
-    response = requests.request("POST", url, data=payload, headers=headers)
+    response = requests.request("POST", url, data=str(payload), headers=headers)
+    return ujson.loads(ujson.loads(response.text))['JsonData']
 
-    print(json.loads(response.text))
 
 if __name__ == '__main__':
     #print(timeit.timeit("getquote('INFY')", globals=globals(), number=1))

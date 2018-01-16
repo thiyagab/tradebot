@@ -53,7 +53,7 @@ SYNTAX = "Make a call in this format\n" \
          "For futures:\n" \
          "e.g BUY CGPOWER.JAN@92\n"
 
-errormsgs = {INVALIDSYNTAX: "syntax oyunga kudra\n", INVALIDSYMBOL: "Symbol thappu.", GENERALERROR: "Unknown Error!"}
+errormsgs = {INVALIDSYNTAX: "Usage: BUY|SELL 'symbol'@'pricerange' SL@'pricerange\n", INVALIDSYMBOL: "Invalid symbol.", GENERALERROR: "Unknown Error!"}
 
 
 # Define a few command handlers. These usually take the two arguments bot and
@@ -62,17 +62,6 @@ def start(bot, update):
     """Send a message when the command /start is issued."""
     update.message.reply_text(HELPTXT)
     return QUERY
-
-
-def help(bot, update):
-    """Send a message when the command /help is issued."""
-    update.message.reply_text(HELPTXT)
-    return nextconversation(update)
-
-
-def echo(bot, update):
-    """Echo the user message."""
-    update.message.reply_text(update.message.text)
 
 
 def quote(bot, update):
@@ -91,8 +80,8 @@ def quote(bot, update):
                 return QUERY
         else:
             return replyquote(text.upper(), update)
-    except:
-        logger.warning('quote error "%s"', error)
+    except Exception as e:
+        logger.warning('quote error "%s"', e)
         update.message.reply_text("Invalid symbol or unknown error!")
         return nextconversation(update)
 
@@ -124,7 +113,7 @@ def replyquote(symbol, update, chat_id=None, message_id=None, bot=None):
         message += "\n Make a /q"
 
     url = data.geturl(stock.sym)
-    keyboard = [[InlineKeyboardButton("Refresh", callback_data='3' + stock.querysymbol), InlineKeyboardButton("More", url=url)],
+    keyboard = [[InlineKeyboardButton("Refresh", callback_data='3' + stock.sym), InlineKeyboardButton("More", url=url)],
                 # [InlineKeyboardButton("Buy", callback_data='1' + symbol),
                 #  InlineKeyboardButton("Sell", callback_data='2' + symbol)]
                 ]
@@ -186,6 +175,15 @@ def error(bot, update, error):
 def done(bot, update, user_data=None):
     update.message.reply_text("Happy trading")
     return nextconversation(update)
+
+def results(bot,update):
+    results=db.getevents()['Results']
+    names= [result['SName'] for result in results]
+    namestext="Today's Results:\n\n"
+    for name in names:
+        namestext+=name+'\n'
+
+    return update.message.reply_text(namestext)
 
 
 def call(bot, update):
@@ -331,7 +329,12 @@ def alerts(bot, update):
 
 def alert(bot, update):
     commands = update.message.text.upper().partition(' ')[2]
-    # split(r'(>+|<+)')
+
+    if not commands[2]:
+        update.message.reply_text("Usage: Alert INFY > 1000")
+        return nextconversation(update)
+
+
     if '>' in commands:
         commands = commands.split('>')
         operation = '>'
@@ -351,7 +354,7 @@ def alert(bot, update):
     return nextconversation(update)
 
 
-def processquery(bot, update, user_data):
+def processquery(bot, update, user_data=None):
     logger.info("Query: "+update.message.text)
     text = update.message.text.upper()
     try:
@@ -367,7 +370,13 @@ def processquery(bot, update, user_data):
         elif text.startswith('CALLS'):
             return calls(bot, update)
         elif text.startswith("HELP"):
-            return help(bot, update)
+            return start(bot, update)
+        elif text=="START":
+            return start(bot, update)
+        elif text=="CANCEL":
+            return done(bot, update)
+        elif text == "RESULTS":
+            return results(bot, update)
         elif text=="WATCHLIST":
             return watchlist(bot,update)
         elif text.startswith("WATCH"):
@@ -430,10 +439,10 @@ def notifyalert(chatid, text,disable_web_page_preview=None,parse_mode=None):
 def setupconvhandler():
     # Add conversation handler with the states GENDER, PHOTO, LOCATION and BIO
     conv_handler = ConversationHandler(
-        entry_points=[CommandHandler('start', start), CommandHandler('quote', quote), CommandHandler('call', call),
-                      CommandHandler('calls', calls),
-                      CommandHandler('done', done),
-                      CommandHandler('ipo', ipo)],
+        entry_points=[CommandHandler('start', processquery), CommandHandler('quote', processquery), CommandHandler('call', processquery),
+                      CommandHandler('calls', processquery),
+                      CommandHandler('done', processquery),
+                      CommandHandler('ipo', processquery)],
 
         states={
             SYMBOL: [MessageHandler(Filters.text,
@@ -466,8 +475,8 @@ def main():
     # 535372141:AAEgx8VtahWGWWUYhFcYR0zonqIHycRMXi0   - dev token
     # 534849104:AAHGnCHl4Q3u-PauqDZ1tspUdoWzH702QQc   - live token
 
-    # updater = Updater("535372141:AAEgx8VtahWGWWUYhFcYR0zonqIHycRMXi0")  #Dev
-    updater = Updater("534849104:AAHGnCHl4Q3u-PauqDZ1tspUdoWzH702QQc")  # Live
+    updater = Updater("535372141:AAEgx8VtahWGWWUYhFcYR0zonqIHycRMXi0")  #Dev
+    # updater = Updater("534849104:AAHGnCHl4Q3u-PauqDZ1tspUdoWzH702QQc")  # Live
 
     # Get the dispatcher to register handlers
     dp = updater.dispatcher
@@ -487,10 +496,8 @@ def main():
     # Start the Bot
     updater.start_polling()
 
-    updater.job_queue.run_repeating(callback=schedulers.ipos,interval=12*60*60,first=datetime.datetime.now())
-
+    schedulers.schedulejobs(updater.job_queue)
     fromtwitter.startstreaming(notifyalert)
-
     data.startstreaming(notifyalert)
 
 

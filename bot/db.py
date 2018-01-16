@@ -83,6 +83,17 @@ def insertipos(ipos):
     ipotable = tdb.table('ipos')
     ipotable.insert_multiple(ipos)
 
+def insertevents(events):
+    tdb.purge_table('events')
+    ipotable = tdb.table('events')
+    ipotable.insert_multiple(events)
+
+
+
+def getevents():
+    eventstable = tdb.table('events')
+    return eventstable.all()
+
 def getipos():
     ipotable = tdb.table('ipos')
     return ipotable.all()
