@@ -1,22 +1,20 @@
 from pytz import utc, timezone
 from telegram import TelegramError
 from tweepy.streaming import StreamListener
-from tweepy import OAuthHandler
-from tweepy import Stream
-from bot.util import escape_markdown,prepare_tweet_text
-from bot.util import logger
+from tweepy import OAuthHandler,Stream
+from bot.util import escape_markdown,prepare_tweet_text,logger
+from bot.config import config
 import sys,telegram,html,re
 
 # Variables that contains yours credentials to access Twitter API
-access_token = "83812829-L0Myd620u1IPoNfD0hQMtsjotbYNN9TlQGr3GK2rA"
-access_token_secret = "rBjM7OThWglsYwOauXZmBXHywiP4eVeeccVKksEr7QgsG"
-consumer_key = "ZIYZlTLiXBZnWbAzo45G38apc"
-consumer_secret = "fDEz1QkietFosqJGY7xpRF0jYCWYuzGIIwEuPWosdETn3Od0FG"
+access_token = config['twitter']['ACCESS_TOKEN']
+access_token_secret = config['twitter']['ACCESS_SECRET']
+consumer_key = config['twitter']['CONSUMER_KEY']
+consumer_secret = config['twitter']['CONSUMER_SECRET']
 
 
 
-# This is a basic listener that just prints received tweets to stdout.
-class StdOutListener(StreamListener):
+class TweetListener(StreamListener):
 
     # def on_data(self, data):
     #     print(data)
@@ -93,7 +91,7 @@ def send_tweet(tweet):
         created_at = created_dt.strftime('%b %d %H:%M')
         if fnnotifyalert:
             fnnotifyalert(
-                chatid='@stocktweets',
+                chatid='@marketnewsindia',
                 text="""
     {link_preview}*{name}* ([@{screen_name}](https://twitter.com/{screen_name})) 
 
@@ -109,7 +107,7 @@ def send_tweet(tweet):
                 disable_web_page_preview=not media_url,
                 parse_mode=telegram.ParseMode.MARKDOWN)
 
-    except TelegramError as e:
+    except Exception as e:
         logger.error("Error",e)
 
 fnnotifyalert = None
@@ -117,7 +115,7 @@ def startstreaming(notifyalert=None):
     global fnnotifyalert
     fnnotifyalert = notifyalert
     logger.info('Listening to twitter..')
-    l = StdOutListener()
+    l = TweetListener()
     auth = OAuthHandler(consumer_key, consumer_secret)
     auth.set_access_token(access_token, access_token_secret)
     # api = API(auth)

@@ -26,7 +26,8 @@ from telegram import ParseMode, Chat
 from telegram.ext import (Updater, CommandHandler, MessageHandler, Filters, RegexHandler,
                           ConversationHandler, CallbackQueryHandler)
 
-from bot import db, data,schedulers
+from bot import db, data,schedulers,config
+from bot.config import config
 from alerts.twitter import fromtwitter
 
 # Enable logging
@@ -475,8 +476,16 @@ def main():
     # 535372141:AAEgx8VtahWGWWUYhFcYR0zonqIHycRMXi0   - dev token
     # 534849104:AAHGnCHl4Q3u-PauqDZ1tspUdoWzH702QQc   - live token
 
+    token_key='LIVE_TOKEN'
+    if len(sys.argv )>1 and sys.argv[1].upper()=='DEV':
+        token_key='DEV_TOKEN'
+
+
+
+
     # updater = Updater("535372141:AAEgx8VtahWGWWUYhFcYR0zonqIHycRMXi0")  #Dev
-    updater = Updater("534849104:AAHGnCHl4Q3u-PauqDZ1tspUdoWzH702QQc")  # Live
+
+    updater = Updater(config['telegram'][token_key])  # Live
 
     # Get the dispatcher to register handlers
     dp = updater.dispatcher
@@ -491,10 +500,12 @@ def main():
     # log all errors
     dp.add_error_handler(error)
 
-    logger.info("Starting the bot...")
+    logger.info("Starting the bot in "+("DEV" if token_key=="DEV_TOKEN" else "LIVE"))
 
     # Start the Bot
     updater.start_polling()
+
+
 
     schedulers.schedulejobs(updater.job_queue)
     fromtwitter.startstreaming(notifyalert)

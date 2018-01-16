@@ -110,7 +110,7 @@ def on_tick(ticks, ws):
                         text = "Alert: price lower than " + alertprice + " ltp: " + str(ltp) + " for " + alert.sym
 
                 if text:
-                    db1.deletealert(alert.sym, alert.chatid, alert.op)
+                    db.deletealert(alert.sym, alert.chatid, alert.op)
                     fnnotifyalert(int(alert.chatid), text)
 
         # if tick[0]['last_price'] > alert[2]
