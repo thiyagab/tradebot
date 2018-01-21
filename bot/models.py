@@ -45,6 +45,14 @@ class Alert(BaseModel):
     class Meta:
         indexes=((('sym','op','chatid'), True), )
 
+class Events(BaseModel):
+    name=CharField()
+    date=DateTimeField()
+    sym=CharField(null=True)
+    type=CharField(null=True)
+
+
+
 # db.connect()
 # db.create_tables([Alert,Calls],safe=True)
 

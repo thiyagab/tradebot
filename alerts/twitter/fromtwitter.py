@@ -89,47 +89,50 @@ def send_tweet(tweet):
         tz = timezone('Asia/Kolkata')
         created_dt = created_dt.astimezone(tz)
         created_at = created_dt.strftime('%b %d %H:%M')
-        if fnnotifyalert:
-            fnnotifyalert(
-                chatid='@marketnewsindia',
-                text="""
-    {link_preview}*{name}* ([@{screen_name}](https://twitter.com/{screen_name})) 
-
-{text}
-    """
-                    .format(
-                    link_preview=media_url,
-                    text=prepare_tweet_text(tweet['text']),
-                    name=escape_markdown(tweet['user']),
-                    screen_name=tweet['screen_name'],
-                    created_at=created_at,
-                ),
-                disable_web_page_preview=not media_url,
-                parse_mode=telegram.ParseMode.MARKDOWN)
+        channel = config['telegram']['channel']
+        if channel:
+            if fnnotifyalert:
+                fnnotifyalert(
+                    chatid=channel,
+                    text="""
+        {link_preview}*{name}* ([@{screen_name}](https://twitter.com/{screen_name})) 
+    
+    {text}
+        """
+                        .format(
+                        link_preview=media_url,
+                        text=prepare_tweet_text(tweet['text']),
+                        name=escape_markdown(tweet['user']),
+                        screen_name=tweet['screen_name'],
+                        created_at=created_at,
+                    ),
+                    disable_web_page_preview=not media_url,
+                    parse_mode=telegram.ParseMode.MARKDOWN)
 
     except Exception as e:
         logger.error("Error",e)
 
 fnnotifyalert = None
 def startstreaming(notifyalert=None):
-    global fnnotifyalert
-    fnnotifyalert = notifyalert
-    logger.info('Listening to twitter..')
-    l = TweetListener()
-    auth = OAuthHandler(consumer_key, consumer_secret)
-    auth.set_access_token(access_token, access_token_secret)
-    # api = API(auth)
-    #
+    if config['telegram']['channel']:
+        global fnnotifyalert
+        fnnotifyalert = notifyalert
+        logger.info('Listening to twitter..')
+        l = TweetListener()
+        auth = OAuthHandler(consumer_key, consumer_secret)
+        auth.set_access_token(access_token, access_token_secret)
+        # api = API(auth)
+        #
 
-    # users=api.lookup_users(screen_names=['in_tradingview','Brainandmoney'])
-    # for user in users:
-    #     print(user.id,user.name )
+        # users=api.lookup_users(screen_names=['in_tradingview','Brainandmoney'])
+        # for user in users:
+        #     print(user.id,user.name )
 
-    stream = Stream(auth, l)
+        stream = Stream(auth, l)
 
-    # This line filter tweets from the words.
-    stream.filter(follow=['114968505'], languages=['en'],async=True)
-    # stream.filter(track=['android'], languages=['en'], async=False)
+        # This line filter tweets from the words.
+        stream.filter(follow=['114968505'], languages=['en'],async=True)
+        # stream.filter(track=['android'], languages=['en'], async=False)
 
 if __name__ == '__main__':
     # This handles Twitter authetification and the connection to Twitter Streaming API

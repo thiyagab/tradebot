@@ -50,22 +50,34 @@ def getstreamingdata(querylist, names=None,symbols=None):
 
 
 def getevents():
-    url = "https://ewmw.edelweiss.in/api/Market/MarketsModule/Events"
+
     time=datetime.datetime.now()
     # if the market is closed, then get results for next day
     if time.hour>15 and time.minute>0:
         time=time.replace(day=time.day+1)
 
-    date=time.strftime('%Y-%m-%d')
-    payload = {"dt":date}
+    events={}
+    for i in range(7):
+        date=time.strftime('%Y-%m-%d')
+        event=getevent(date)
+        events[date]=event
+        time = time.replace(day=time.day + 1)
+
+    return events
+
+
+def getevent(date):
+    payload = {"dt": date}
     headers = {
         'User-Agent': "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_13_2) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/63.0.3239.132 Safari/537.36",
         'Content-Type': "application/json;charset=UTF-8",
     }
-
+    url = "https://ewmw.edelweiss.in/api/Market/MarketsModule/Events"
     response = requests.request("POST", url, data=str(payload), headers=headers)
-    return ujson.loads(ujson.loads(response.text))['JsonData']
-
+    events = ujson.loads(ujson.loads(response.text))['JsonData']['Results']
+    names = [result['SName'] for result in events]
+    # print(date+" "+str(names))
+    return names
 
 if __name__ == '__main__':
     #print(timeit.timeit("getquote('INFY')", globals=globals(), number=1))

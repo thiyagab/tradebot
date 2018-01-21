@@ -29,6 +29,7 @@ from telegram.ext import (Updater, CommandHandler, MessageHandler, Filters, Rege
 from bot import db, data,schedulers,config
 from bot.config import config
 from alerts.twitter import fromtwitter
+from alerts.rss import reader
 
 # Enable logging
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
@@ -74,10 +75,10 @@ def quote(bot, update):
                 symbol = parttext[2].upper()
                 return replyquote(symbol, update)
             else:
-                if isgroup(update):
-                    update.message.reply_text('nse symbol?\n(for futures, <symbol> <month>')
-                else:
-                    update.message.reply_text(STARTCONV)
+                # if isgroup(update):
+                #     update.message.reply_text('nse symbol?\n(for futures, <symbol> <month>')
+                # else:
+                update.message.reply_text(STARTCONV)
                 return QUERY
         else:
             return replyquote(text.upper(), update)
@@ -177,15 +178,6 @@ def done(bot, update, user_data=None):
     update.message.reply_text("Happy trading")
     return nextconversation(update)
 
-def results(bot,update):
-    results=db.getevents()['Results']
-    names= [result['SName'] for result in results]
-    namestext="Today's Results:\n\n"
-    for name in names:
-        namestext+=name+'\n'
-
-    return update.message.reply_text(namestext)
-
 
 def call(bot, update):
     update.message.reply_text(SYNTAX, parse_mode=ParseMode.HTML)
@@ -228,8 +220,11 @@ def watch(bot,update,user_data=None):
     try:
         text = update.message.text.upper()
         tokens=text.partition(' ')
-        if tokens[2]:
-            stock=data.fetchquote(tokens[2])
+        symbol=tokens[2]
+        if symbol.startswith('WATCH'):
+            symbol=symbol.partition(' ')[2]
+        if symbol:
+            stock=data.fetchquote(symbol)
             # reusing the same calls db with type as watch and using the misc column for query symbol
             db.createcall(type=db.WATCH_TYPE, symbol=stock.sym, callrange=stock.ltp,
                            misc=stock.querysymbol, user=update.message.from_user.first_name, chatid=str(update.message.chat_id),
@@ -312,6 +307,27 @@ def deletecall(symbol, update):
         update.message.reply_text("No calls for symbol " + symbol)
 
 
+def results(bot,update):
+    replytxt=''
+    eventsmap=db.getevents()
+    for k,v in eventsmap.items():
+        replytxt+='\n<b>'+k+":</b>\n"
+        for event in v:
+            replytxt+=event.name+", "
+        replytxt+="\n\n"
+    if replytxt:
+        update.message.reply_text(replytxt,parse_mode=ParseMode.HTML)
+    else:
+        update.message.reply_text("No results today", parse_mode=ParseMode.HTML)
+
+def news(bot,update):
+    replytxt=reader.readnews()
+
+    if replytxt:
+        update.message.reply_text(replytxt,parse_mode=ParseMode.HTML,disable_web_page_preview=True)
+    else:
+        update.message.reply_text("No News today", parse_mode=ParseMode.HTML)
+
 def query(bot, update):
     command = update.message.text.upper().partition(' ')[2]
     if command:
@@ -378,7 +394,7 @@ def processquery(bot, update, user_data=None):
             return done(bot, update)
         elif text == "RESULTS":
             return results(bot, update)
-        elif text=="WATCHLIST":
+        elif text.startswith("WATCHLIST"):
             return watchlist(bot,update)
         elif text.startswith("WATCH"):
             return watch(bot,update)
@@ -386,8 +402,12 @@ def processquery(bot, update, user_data=None):
             return ipo(bot, update)
         elif text == "Q":
             return quote(bot, update)
+        elif text == "NEWS":
+            return news(bot, update)
         elif text.startswith('ALERTS'):
             return alerts(bot, update)
+        elif text.startswith('RESULT'):
+            return results(bot, update)
         elif text.startswith('DELETE'):
             symbol = text.partition(' ')[2]
             return deletecall(symbol, update)
@@ -407,11 +427,14 @@ def processquery(bot, update, user_data=None):
 def setupnewconvhandler():
     # Add conversation handler with the states GENDER, PHOTO, LOCATION and BIO
     conv_handler = ConversationHandler(
-        entry_points=[CommandHandler('start', start), CommandHandler('q', query),
+        entry_points=[CommandHandler('start', processquery), CommandHandler('q', processquery),
                       CommandHandler('help', help),
-                      CommandHandler('ipo', ipo),
-                      CommandHandler('watchlist', watchlist),
-                      CommandHandler('cancel', done)],
+                      CommandHandler('ipo', processquery),
+                      CommandHandler('watchlist', processquery),
+                      CommandHandler('calls', processquery),
+                      CommandHandler('results', processquery),
+                      CommandHandler('news', processquery),
+                      CommandHandler('cancel', processquery)],
 
         states={
             QUERY: [MessageHandler(Filters.text,

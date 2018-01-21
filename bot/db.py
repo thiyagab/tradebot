@@ -1,4 +1,6 @@
-from bot.models import Calls,Alert,db
+import datetime
+
+from bot.models import Calls,Alert,Events,db
 from bot.util import logger
 from peewee import reduce,operator
 from tinydb import TinyDB,JSONStorage
@@ -19,8 +21,8 @@ def deleteoldwatchlist():
     Calls.delete().where((Calls.type == WATCH_TYPE) & (Calls.time.not_in(calls))).execute()
 
 def deletealert(symbol, chatid, operation):
-    logger.info('Deleting... ', symbol, chatid, operation)
-    Alert.delete().where((Alert.sym==symbol) and (Alert.op==operation) and (Alert.chatid==chatid)).execute()
+    logger.info('Deleting Alert... '+ symbol+" "+chatid+" "+operation)
+    Alert.delete().where((Alert.sym==symbol) & (Alert.op==operation) & (Alert.chatid==chatid)).execute()
     updatealerts()
 
 
@@ -70,9 +72,12 @@ def getcalls(chatid, symbol=None):
 
 def getwatchlist(chatid):
     watchlist = list()
-    for call in Calls.select().where((Calls.chatid==chatid) and Calls.type==WATCH_TYPE):
+    for call in Calls.select().where((Calls.chatid==chatid) & (Calls.type==WATCH_TYPE)):
         watchlist.append(call)
     return watchlist
+
+
+
 
 def createcall(type, symbol, user, chatid, userid,callrange=None, misc=None,desc=None):
     Calls.insert(sym=symbol, type=type, callrange=callrange, chatid=chatid,user=user,userid=userid,misc=misc,desc=desc).upsert().execute()
@@ -84,15 +89,27 @@ def insertipos(ipos):
     ipotable.insert_multiple(ipos)
 
 def insertevents(events):
-    tdb.purge_table('events')
-    ipotable = tdb.table('events')
-    ipotable.insert_multiple(events)
+    for k,v in events.items():
+        datetimeobj = datetime.datetime.strptime(k,'%Y-%m-%d')
+        # companies=events[date]
+        for company in v:
+            Events.insert(name=company,date=datetimeobj,type="RESULT").upsert().execute()
 
 
+def deleteevents():
+    Events.delete().where(Events.type=='RESULT').execute()
 
 def getevents():
-    eventstable = tdb.table('events')
-    return eventstable.all()
+    nextthree = datetime.date.today() +datetime.timedelta(days=3)
+    eventsmap={}
+    for event in Events.select().where((Events.date>= datetime.date.today()) & (Events.date<=nextthree)):
+        date= event.date.strftime('%Y-%m-%d')
+        events=eventsmap.get(date)
+        if not events:
+            events =list()
+        events.append(event)
+        eventsmap[date]=events
+    return eventsmap
 
 def getipos():
     ipotable = tdb.table('ipos')
@@ -100,5 +117,5 @@ def getipos():
 
 def initdb():
     db.connect()
-    db.create_tables([Alert,Calls],safe=True)
+    db.create_tables([Alert,Calls,Events],safe=True)
     db.close()
