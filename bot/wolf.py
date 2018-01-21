@@ -428,7 +428,7 @@ def setupnewconvhandler():
     # Add conversation handler with the states GENDER, PHOTO, LOCATION and BIO
     conv_handler = ConversationHandler(
         entry_points=[CommandHandler('start', processquery), CommandHandler('q', processquery),
-                      CommandHandler('help', help),
+                      CommandHandler('help', processquery),
                       CommandHandler('ipo', processquery),
                       CommandHandler('watchlist', processquery),
                       CommandHandler('calls', processquery),
