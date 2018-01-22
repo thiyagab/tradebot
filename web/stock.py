@@ -1,3 +1,6 @@
+from datetime import datetime
+
+
 class Stock:
     def __init__(self, sym, ltp='', o='', h='', l='', c='', cp='', ltt='', name='', querysymbol=''):
         self.sym=sym
@@ -18,13 +21,15 @@ class Stock:
             str=''
         return str;
 
-
+    def formatltt(self):
+        return datetime.strptime(self.ltt,'%d/%m/%Y  %H:%M:%S').strftime('%b %d, %H:%M')
     def html(self):
-        return '<b>' + self.name + '\n\n' \
-               +'LTP    :   '+self.ltp+'  ( '+self.cp+'% )</b>\n\n' \
+        return '<b>' + self.name.upper() + '</b>\n' \
+               +'<pre>'+self.formatltt()+"</pre>\n\n"\
+               +'<b>LTP    :   '+self.ltp+'  ( '+self.cp+'% )</b>\n\n' \
                +'<pre>' \
-               +'o  : '+self.o+'    h : '+self.h + '\n'\
-               +'l  : '+self.l+'    c : '+self.c + '</pre>\n\n' \
+               +'o : '+self.o+'  h : '+self.h + '\n'\
+               +'l : '+self.l+'  c : '+self.c + '</pre>\n\n' \
 
     def markup(self):
        return  """*{sym}: {ltp} ({cp}%)*

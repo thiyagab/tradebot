@@ -21,7 +21,7 @@ import logging
 import sys
 
 import datetime
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup, ChatMember
 from telegram import ParseMode, Chat
 from telegram.ext import (Updater, CommandHandler, MessageHandler, Filters, RegexHandler,
                           ConversationHandler, CallbackQueryHandler)
@@ -58,11 +58,27 @@ SYNTAX = "Make a call in this format\n" \
 errormsgs = {INVALIDSYNTAX: "Usage: BUY|SELL 'symbol'@'pricerange' SL@'pricerange\n", INVALIDSYMBOL: "Invalid symbol.", GENERALERROR: "Unknown Error!"}
 
 
+def reply(text,bot=None,update=None,parsemode=None,chatid=None,reply_markup=None,disable_web_page_preview=None):
+
+    if bot and isgroup(update) and not isadmin(bot,chat_id=update.effective_message.chat_id,user_id=update.effective_message.from_user.id):
+        if not chatid:
+            chatid=update.effective_message.from_user.id
+        bot.send_message(chat_id=chatid,text=text,
+                         parse_mode=parsemode,
+                         reply_markup=reply_markup,
+                         disable_web_page_preview=disable_web_page_preview)
+        update.effective_message.reply_text("Lets not spam the group, I replied you in private chat @btstockbot")
+    elif update:
+        update.effective_message.reply_text(text,
+                                  parse_mode=parsemode,
+                                  reply_markup=reply_markup,
+                                  disable_web_page_preview=disable_web_page_preview)
+
 # Define a few command handlers. These usually take the two arguments bot and
 # update. Error handlers also receive the raised TelegramError object in error.
 def start(bot, update):
     """Send a message when the command /start is issued."""
-    update.message.reply_text(HELPTXT)
+    reply(HELPTXT,bot=bot,update=update)
     return QUERY
 
 
@@ -73,15 +89,15 @@ def quote(bot, update):
             parttext = text.partition(' ')
             if parttext[2]:
                 symbol = parttext[2].upper()
-                return replyquote(symbol, update)
+                return replyquote(symbol, update=update,bot=bot)
             else:
                 # if isgroup(update):
                 #     update.message.reply_text('nse symbol?\n(for futures, <symbol> <month>')
                 # else:
-                update.message.reply_text(STARTCONV)
+                reply(STARTCONV, bot=bot, update=update)
                 return QUERY
         else:
-            return replyquote(text.upper(), update)
+            return replyquote(text.upper(), update=update,bot=bot)
     except Exception as e:
         logger.warning('quote error "%s"', e)
         update.message.reply_text("Invalid symbol or unknown error!")
@@ -99,6 +115,10 @@ def isgroup(update):
     type = update.effective_chat.type
     return (type == Chat.GROUP or type == Chat.SUPERGROUP)
 
+def isadmin(bot,chat_id,user_id):
+    status=bot.get_chat_member(chat_id, user_id).status
+    return status ==ChatMember.CREATOR or status == ChatMember.ADMINISTRATOR
+
 
 def replyquote(symbol, update, chat_id=None, message_id=None, bot=None):
     # when called from refresh action, update object wont have chatid
@@ -115,18 +135,18 @@ def replyquote(symbol, update, chat_id=None, message_id=None, bot=None):
         message += "\n Make a /q"
 
     url = data.geturl(stock.sym)
-    keyboard = [[InlineKeyboardButton("Refresh", callback_data='3' + stock.sym), InlineKeyboardButton("More", url=url)],
+    keyboard = [[InlineKeyboardButton("Refresh", callback_data='3' + stock.sym), InlineKeyboardButton("Watchlist", callback_data='1'+stock.sym)],
                 # [InlineKeyboardButton("Buy", callback_data='1' + symbol),
                 #  InlineKeyboardButton("Sell", callback_data='2' + symbol)]
                 ]
 
     reply_markup = InlineKeyboardMarkup(keyboard)
-    if bot:
+    if bot and message_id:
         bot.edit_message_text(text=message,
                               chat_id=chat_id,
                               message_id=message_id, parse_mode=ParseMode.HTML, reply_markup=reply_markup)
     else:
-        update.message.reply_text(text=message, parse_mode=ParseMode.HTML, reply_markup=reply_markup)
+        reply(text=message,update=update,bot=bot,parsemode=ParseMode.HTML,reply_markup=reply_markup)
     return nextconversation(update)
 
 
@@ -149,13 +169,16 @@ def button(bot, update):
     if query.data.startswith('3'):
         symbol = query.data[1:]
         replyquote(symbol, update, chat_id=query.message.chat_id, message_id=query.message.message_id, bot=bot)
+    elif query.data.startswith('1'):
+        symbol=query.data[1:]
+        addtowatchlist(symbol=symbol,bot=bot,update=update)
     else:
         query.message.reply_text("Not implemented yet")
 
 
 def calls(bot, update):
     try:
-        update.message.reply_text(getcalls(update.message.chat_id), parse_mode=ParseMode.HTML)
+        reply(text=getcalls(update.message.chat_id),update=update,bot=bot,parsemode=ParseMode.HTML)
         return nextconversation(update)
     except Exception as e:
         update.message.reply_text("Error", e)
@@ -163,7 +186,7 @@ def calls(bot, update):
 
 def ipo(bot, update):
     try:
-        update.message.reply_text(data.getnseipo(), parse_mode=ParseMode.HTML)
+        reply(text=data.getnseipo(), update=update, bot=bot, parsemode=ParseMode.HTML)
         return nextconversation(update)
     except Exception as e:
         update.message.reply_text("Error", e)
@@ -180,7 +203,7 @@ def done(bot, update, user_data=None):
 
 
 def call(bot, update):
-    update.message.reply_text(SYNTAX, parse_mode=ParseMode.HTML)
+    reply(text=SYNTAX, update=update, bot=bot, parsemode=ParseMode.HTML)
     return MAKECALL
 
 
@@ -203,13 +226,12 @@ def watchlist(bot, update):
                 low=stock.l
                 displaytext+="<b>"+sym+"</b>"\
                     +"<pre>"\
-                    +"\nAT  : "+addedprice+"    LTP : "+ltp\
-                    +"\nHI  : "+hi+"    LO  : "+low\
-                    +"\nBY  : "+user\
+                    +"\nAT  : "+addedprice+"  LTP : "+ltp\
+                    +"\nHI  : "+hi+"  LO  : "+low\
                     +"</pre>\n\n"
         if not displaytext:
             displaytext="Empty watchlist"
-        update.message.reply_text(displaytext,parse_mode=ParseMode.HTML)
+        reply(text=displaytext, update=update, bot=bot, parsemode=ParseMode.HTML)
     except Exception as e:
         update.message.reply_text("Error in watchlist")
     return nextconversation(update)
@@ -224,18 +246,22 @@ def watch(bot,update,user_data=None):
         if symbol.startswith('WATCH'):
             symbol=symbol.partition(' ')[2]
         if symbol:
-            stock=data.fetchquote(symbol)
-            # reusing the same calls db with type as watch and using the misc column for query symbol
-            db.createcall(type=db.WATCH_TYPE, symbol=stock.sym, callrange=stock.ltp,
-                           misc=stock.querysymbol, user=update.message.from_user.first_name, chatid=str(update.message.chat_id),
-                           userid=str(update.message.from_user.id))
-            update.message.reply_text(text="Added to watchlist\n" + str(stock), parse_mode=ParseMode.HTML)
-            db.deleteoldwatchlist()
+           addtowatchlist(symbol=symbol,bot=bot,update=update)
         else:
             update.message.reply_text("Nothing to add")
     except Exception as e:
         update.message.reply_text("Error adding to watchlist")
     return nextconversation(update)
+
+def addtowatchlist(symbol,bot,update):
+    stock = data.fetchquote(symbol)
+    # reusing the same calls db with type as watch and using the misc column for query symbol
+    db.createcall(type=db.WATCH_TYPE, symbol=stock.sym, callrange=stock.ltp,
+                  misc=stock.querysymbol, user=update.effective_message.from_user.first_name, chatid=str(update.effective_message.chat_id),
+                  userid=str(update.effective_message.from_user.id))
+    reply(text="Added to watchlist\n" + str(stock), update=update, bot=bot, parsemode=ParseMode.HTML)
+    db.deleteoldwatchlist()
+
 
 def makecall(bot, update, user_data):
     try:
@@ -257,7 +283,7 @@ def makecall(bot, update, user_data):
 
         db.createcall(type=type, symbol= symbol, callrange= callrange, desc= desc, user=update.message.from_user.first_name, chatid=str(update.message.chat_id),
                        userid=str(update.message.from_user.id))
-        update.message.reply_text(text="Call made\n" + quote, parse_mode=ParseMode.HTML)
+        reply(text="Call made\n" + quote, update=update, bot=bot, parsemode=ParseMode.HTML)
         db.deleteoldcalls()
 
     except:
@@ -290,7 +316,7 @@ def validatecall(text):
 def errorreplytocall(update, errortype):
     message = "Hi " + getusername(
         update.message.from_user.first_name) + ",\n" + errormsgs[errortype] + "\nTry again or type 'skip' to cancel"
-    update.message.reply_text(text=message, parse_mode=ParseMode.HTML)
+    reply(text=message, update=update, parsemode=ParseMode.HTML)
 
 
 def getusername(name):
@@ -316,17 +342,17 @@ def results(bot,update):
             replytxt+=event.name+", "
         replytxt+="\n\n"
     if replytxt:
-        update.message.reply_text(replytxt,parse_mode=ParseMode.HTML)
+        reply(text=replytxt, update=update, bot=bot,parsemode=ParseMode.HTML)
     else:
-        update.message.reply_text("No results today", parse_mode=ParseMode.HTML)
+        reply(text="No results today", update=update, bot=bot, parsemode=ParseMode.HTML)
 
 def news(bot,update):
     replytxt=reader.readnews()
 
     if replytxt:
-        update.message.reply_text(replytxt,parse_mode=ParseMode.HTML,disable_web_page_preview=True)
+        reply(text=replytxt, update=update, bot=bot, parsemode=ParseMode.HTML,disable_web_page_preview=True)
     else:
-        update.message.reply_text("No News today", parse_mode=ParseMode.HTML)
+        reply(text="No News today", update=update, bot=bot, parsemode=ParseMode.HTML)
 
 def query(bot, update):
     command = update.message.text.upper().partition(' ')[2]
@@ -334,13 +360,13 @@ def query(bot, update):
         update.message.text = command
         return processquery(bot, update, None)
     else:
-        update.message.reply_text(STARTCONV)
+        reply(text=STARTCONV, update=update, bot=bot, parsemode=ParseMode.HTML)
         return QUERY
 
 
 def alerts(bot, update):
     replytxt = db.getalerts(str(update.message.chat_id))
-    update.message.reply_text("Alerts:\n" + (replytxt if replytxt else 'None'))
+    reply(text="Alerts:\n" + (replytxt if replytxt else 'None'), update=update, bot=bot, parsemode=ParseMode.HTML)
     return nextconversation(update)
 
 
@@ -348,7 +374,7 @@ def alert(bot, update):
     commands = update.message.text.upper().partition(' ')[2]
 
     if not commands[2]:
-        update.message.reply_text("Usage: Alert INFY > 1000")
+        reply(text="Usage: Alert INFY > 1000", update=update, bot=bot)
         return nextconversation(update)
 
 
@@ -366,7 +392,7 @@ def alert(bot, update):
         return nextconversation(update)
 
     chat_id = update.message.chat_id
-    update.message.reply_text('Alert set for ' + symbol + " " + price)
+    reply(text='Alert set for ' + symbol + " " + price, update=update, bot=bot)
     db.createalert(symbol, operation, price, str(chat_id))
     return nextconversation(update)
 
@@ -416,10 +442,10 @@ def processquery(bot, update, user_data=None):
         elif len(text) < 50:
             return quote(bot, update)
         else:
-            update.message.reply_text("Not ready to handle this query")
+            reply(text="Not ready to handle this query", update=update, bot=bot)
     except:
         logger.error("Error processing query",sys.exc_info()[0])
-        update.message.reply_text("Error")
+        reply(text="Error", update=update, bot=bot)
 
     return nextconversation(update)
 
@@ -489,6 +515,15 @@ updater = None
 #def schedulejobs():
     # updater.
 
+def newmember(bot, update):
+    # here you receive a list of new members (User Objects) in a single service message
+    new_members = update.message.new_chat_members
+    # do your stuff here:
+    for member in new_members:
+        # update.message.reply_text("Welcome "+member)
+        print(member.name)
+        bot.send_message(chat_id=member.id, text="Hi "+member.name+",\nWelcome to our group")
+
 def main():
 
     db.initdb()
@@ -516,6 +551,7 @@ def main():
     dp.add_handler(setupnewconvhandler())
 
     dp.add_handler(CallbackQueryHandler(button))
+    dp.add_handler(MessageHandler(Filters.status_update.new_chat_members, newmember))
 
     # on noncommand i.e message - echo the message on Telegram
     # dp.add_handler(MessageHandler(Filters.text, echo))

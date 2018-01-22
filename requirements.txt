@@ -5,3 +5,4 @@ lxml
 feedparser
 tinydb
 ujson
+emoji
