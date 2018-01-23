@@ -224,10 +224,12 @@ def watchlist(bot, update):
                 ltp=stock.ltp
                 hi=stock.h
                 low=stock.l
+                cp="{:.2f}".format(((float(ltp)-float(addedprice))/float(addedprice))*100)
                 displaytext+="<b>"+sym+"</b>"\
                     +"<pre>"\
                     +"\nAT  : "+addedprice+"  LTP : "+ltp\
                     +"\nHI  : "+hi+"  LO  : "+low\
+                    +"\nCP  : "+cp+"%"\
                     +"</pre>\n\n"
         if not displaytext:
             displaytext="Empty watchlist"
