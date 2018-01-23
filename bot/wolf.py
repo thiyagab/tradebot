@@ -60,7 +60,8 @@ errormsgs = {INVALIDSYNTAX: "Usage: BUY|SELL 'symbol'@'pricerange' SL@'pricerang
 
 def reply(text,bot=None,update=None,parsemode=None,chatid=None,reply_markup=None,disable_web_page_preview=None):
 
-    if bot and isgroup(update) and not isadmin(bot,chat_id=update.effective_message.chat_id,user_id=update.effective_message.from_user.id):
+    isgroupadmin=isadmin(bot,chat_id=update.effective_message.chat_id,user_id=update.effective_message.from_user.id)
+    if bot and isgroup(update) and not isgroupadmin:
         if not chatid:
             chatid=update.effective_message.from_user.id
         bot.send_message(chat_id=chatid,text=text,
@@ -73,13 +74,17 @@ def reply(text,bot=None,update=None,parsemode=None,chatid=None,reply_markup=None
                                   parse_mode=parsemode,
                                   reply_markup=reply_markup,
                                   disable_web_page_preview=disable_web_page_preview)
+    return isgroupadmin
 
 # Define a few command handlers. These usually take the two arguments bot and
 # update. Error handlers also receive the raised TelegramError object in error.
 def start(bot, update):
     """Send a message when the command /start is issued."""
-    reply(HELPTXT,bot=bot,update=update)
-    return QUERY
+    isadmin=reply(HELPTXT,bot=bot,update=update)
+    if not isgroup(update) or isadmin:
+        return QUERY
+    else:
+        return ConversationHandler.END
 
 
 def quote(bot, update):
@@ -94,8 +99,11 @@ def quote(bot, update):
                 # if isgroup(update):
                 #     update.message.reply_text('nse symbol?\n(for futures, <symbol> <month>')
                 # else:
-                reply(STARTCONV, bot=bot, update=update)
-                return QUERY
+                isadmin=reply(STARTCONV, bot=bot, update=update)
+                if not isgroup(update) or isadmin:
+                    return QUERY
+                else:
+                    return ConversationHandler.END
         else:
             return replyquote(text.upper(), update=update,bot=bot)
     except Exception as e:
@@ -362,8 +370,11 @@ def query(bot, update):
         update.message.text = command
         return processquery(bot, update, None)
     else:
-        reply(text=STARTCONV, update=update, bot=bot, parsemode=ParseMode.HTML)
-        return QUERY
+        isadmin=reply(text=STARTCONV, update=update, bot=bot, parsemode=ParseMode.HTML)
+        if not isgroup(update) or isadmin:
+            return QUERY
+        else:
+            return ConversationHandler.END
 
 
 def alerts(bot, update):
