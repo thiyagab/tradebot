@@ -309,12 +309,14 @@ def watch(bot,update,user_data=None):
 
 def addtowatchlist(symbol,bot,update):
     stock = data.fetchquote(symbol)
-
-    db.createcall(type=db.WATCH_TYPE, symbol=stock.sym, callrange=stock.ltp,
-                  querysymbol=stock.querysymbol, user=update.effective_message.from_user.first_name, chatid=str(update.effective_message.chat_id),
-                  userid=str(update.effective_message.from_user.id))
-    reply(text="Added to watchlist\n" + str(stock), update=update, bot=bot, parsemode=ParseMode.HTML)
-    db.deleteoldwatchlist()
+    try:
+        db.createcall(type=db.WATCH_TYPE, symbol=stock.sym, callrange=stock.ltp,
+                      querysymbol=stock.querysymbol, user=update.effective_message.from_user.first_name, chatid=str(update.effective_message.chat_id),
+                      userid=str(update.effective_message.from_user.id))
+        reply(text="Added to watchlist\n" + str(stock), update=update, bot=bot, parsemode=ParseMode.HTML)
+        db.deleteoldwatchlist()
+    except Exception as e:
+        pass
 
 
 def addtoportfolio(bot,update):

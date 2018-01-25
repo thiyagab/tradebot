@@ -95,8 +95,8 @@ def lastupdatedportfolio(chatid):
     return call
 
 
-def createcall(type, symbol, user, chatid, userid,callrange=None, misc=None,desc=None):
-    Calls.insert(sym=symbol, type=type, callrange=callrange, chatid=chatid,user=user,userid=userid,misc=misc,desc=desc).upsert().execute()
+def createcall(type, symbol, user, chatid, userid,callrange=None, misc=None,desc=None,querysymbol=None):
+    Calls.insert(sym=symbol, type=type, callrange=callrange,querysymbol=querysymbol, chatid=chatid,user=user,userid=userid,misc=misc,desc=desc).upsert().execute()
 
 
 def insertipos(ipos):
