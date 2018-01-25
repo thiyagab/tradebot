@@ -41,13 +41,14 @@ MAKECALL, SYMBOL, QUERY = range(3)
 INVALIDSYNTAX, INVALIDSYMBOL, GENERALERROR = range(3)
 VERSION = 'v0.0.6'
 
-HELPTXT = 'The wolf (' + VERSION + ') is here to help you with your stock queries\n\n' \
-          + 'Ask me anything here /q\n' \
-          + '1.Give me a symbol, I will give you the quote\n' \
-          + "2.Say 'Buy infy@9000 sl@990', i will add it in calls\n" \
-          + "3.Say 'Calls', I will give you the last 4 calls in the group\n"
+HELPTXT = 'Wolf the Stock BOT(' + VERSION + ')\n\n' \
+          + 'Current version supports \n' \
+          + '/quote \n' \
+          + '/watchlist \n' \
+          + '/portfolio \n' \
+          + 'Many exciting new features like calls, news, alerts are planned\n'
 
-STARTCONV = 'How can I /help you?'
+STARTCONV = 'Give me the symbol? (e.g. TATA POWER)'
 
 SYNTAX = "Make a call in this format\n" \
          "BUY|SELL 'symbol'@'pricerange' SL@'pricerange'\n" \
@@ -137,15 +138,17 @@ def replyquote(symbol, update, chat_id=None, message_id=None, bot=None):
         message = str(stock)
     else:
         message= "Couldnt find symbol. Try different query\n"
-    message += getcalls(chat_id, symbol)
+    # message += getcalls(chat_id, symbol)
 
     if isgroup(update):
-        message += "\n Make a /q"
+        message += "\n use /quote"
 
     url = data.geturl(stock.sym)
-    keyboard = [[InlineKeyboardButton("Refresh", callback_data='3' + stock.sym), InlineKeyboardButton("Watchlist", callback_data='1'+stock.sym)],
+    keyboard = [[ InlineKeyboardButton("Add to Watchlist", callback_data='1'+stock.sym)],
+                [InlineKeyboardButton("Add to Portfolio",callback_data='2'+stock.sym)]
                 # [InlineKeyboardButton("Buy", callback_data='1' + symbol),
-                #  InlineKeyboardButton("Sell", callback_data='2' + symbol)]
+                #  InlineKeyboardButton("Sell", callback_data='2' + symbol)
+                # InlineKeyboardButton("Refresh", callback_data='3' + stock.sym),]
                 ]
 
     reply_markup = InlineKeyboardMarkup(keyboard)
@@ -171,7 +174,7 @@ def getcalls(chat_id, symbol=None):
     return callstxt
 
 
-def button(bot, update):
+def buttoncallback(bot, update):
     query = update.callback_query
     # Refresh and edit the same message
     if query.data.startswith('3'):
@@ -179,9 +182,16 @@ def button(bot, update):
         replyquote(symbol, update, chat_id=query.message.chat_id, message_id=query.message.message_id, bot=bot)
     elif query.data.startswith('1'):
         symbol=query.data[1:]
+        chatid=query.message.chat_id
+
+        addtowatchlist(symbol=symbol,bot=bot,update=update)
+    elif query.data.startswith('2'):
+        symbol=query.data[1:]
+
         addtowatchlist(symbol=symbol,bot=bot,update=update)
     else:
         query.message.reply_text("Not implemented yet")
+    return QUERY
 
 
 def calls(bot, update):
@@ -195,6 +205,14 @@ def calls(bot, update):
 def ipo(bot, update):
     try:
         reply(text=data.getnseipo(), update=update, bot=bot, parsemode=ParseMode.HTML)
+        return nextconversation(update)
+    except Exception as e:
+        update.message.reply_text("Error", e)
+        return nextconversation(update)
+
+def portfolio(bot, update):
+    try:
+        reply(text="Coming soon..", update=update, bot=bot, parsemode=ParseMode.HTML)
         return nextconversation(update)
     except Exception as e:
         update.message.reply_text("Error", e)
@@ -418,7 +436,7 @@ def processquery(bot, update, user_data=None):
         if text.startswith('/'):
             # ppl may use /q alerts or /q infy in private chat itself, lets process same as in group
             if text.startswith('/Q '):
-                text = text[3:]
+                text = text.partition(' ')[2]
             else:
                 text = text[1:]
         if text.startswith(('BUY', 'SELL', 'SHORT')):
@@ -439,6 +457,8 @@ def processquery(bot, update, user_data=None):
             return watch(bot,update)
         elif text=="IPO":
             return ipo(bot, update)
+        elif text == "PORTFOLIO":
+            return portfolio(bot, update)
         elif text == "Q":
             return quote(bot, update)
         elif text == "NEWS":
@@ -466,10 +486,11 @@ def processquery(bot, update, user_data=None):
 def setupnewconvhandler():
     # Add conversation handler with the states GENDER, PHOTO, LOCATION and BIO
     conv_handler = ConversationHandler(
-        entry_points=[CommandHandler('start', processquery), CommandHandler('q', processquery),
+        entry_points=[CommandHandler('start', processquery), CommandHandler('quote', processquery),
                       CommandHandler('help', processquery),
                       CommandHandler('ipo', processquery),
                       CommandHandler('watchlist', processquery),
+                      CommandHandler('portfolio', processquery),
                       CommandHandler('calls', processquery),
                       CommandHandler('results', processquery),
                       CommandHandler('news', processquery),
@@ -563,7 +584,7 @@ def main():
 
     dp.add_handler(setupnewconvhandler())
 
-    dp.add_handler(CallbackQueryHandler(button))
+    dp.add_handler(CallbackQueryHandler(buttoncallback))
     dp.add_handler(MessageHandler(Filters.status_update.new_chat_members, newmember))
 
     # on noncommand i.e message - echo the message on Telegram

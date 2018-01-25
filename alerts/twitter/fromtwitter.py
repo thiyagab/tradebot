@@ -110,7 +110,7 @@ def send_tweet(tweet):
                     parse_mode=telegram.ParseMode.MARKDOWN)
 
     except Exception as e:
-        logger.error("Error",e)
+        logger.error("Error",str(e))
 
 fnnotifyalert = None
 def startstreaming(notifyalert=None):

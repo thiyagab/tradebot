@@ -7,7 +7,7 @@ from tinydb import TinyDB,JSONStorage
 
 alertslist = list()
 WATCH_TYPE="WATCH"
-LIMIT=5
+LIMIT=10
 
 tdb=TinyDB('store.json',storage=JSONStorage)
 
@@ -93,7 +93,8 @@ def insertevents(events):
         datetimeobj = datetime.datetime.strptime(k,'%Y-%m-%d')
         # companies=events[date]
         for company in v:
-            Events.insert(name=company,date=datetimeobj,type="RESULT").upsert().execute()
+            if company:
+                Events.insert(name=company,date=datetimeobj,type="RESULT").upsert().execute()
 
 
 def deleteevents():
