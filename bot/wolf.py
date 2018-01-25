@@ -26,7 +26,7 @@ from telegram import ParseMode, Chat
 from telegram.ext import (Updater, CommandHandler, MessageHandler, Filters, RegexHandler,
                           ConversationHandler, CallbackQueryHandler)
 
-from bot import db, data,schedulers,config
+from bot import db, data, schedulers, config, formatter
 from bot.config import config
 from alerts.twitter import fromtwitter
 from alerts.rss import reader
@@ -37,7 +37,7 @@ logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s
 
 logger = logging.getLogger(__name__)
 
-MAKECALL, SYMBOL, QUERY = range(3)
+MAKECALL, SYMBOL, QUERY,PORTFOLIO_QUERY = range(4)
 INVALIDSYNTAX, INVALIDSYMBOL, GENERALERROR = range(3)
 VERSION = 'v0.0.6'
 
@@ -145,7 +145,7 @@ def replyquote(symbol, update, chat_id=None, message_id=None, bot=None):
 
     url = data.geturl(stock.sym)
     keyboard = [[ InlineKeyboardButton("Add to Watchlist", callback_data='1'+stock.sym)],
-                [InlineKeyboardButton("Add to Portfolio",callback_data='2'+stock.sym)]
+                [InlineKeyboardButton("Add to Portfolio",callback_data='2'+stock.sym+'#'+stock.querysymbol)]
                 # [InlineKeyboardButton("Buy", callback_data='1' + symbol),
                 #  InlineKeyboardButton("Sell", callback_data='2' + symbol)
                 # InlineKeyboardButton("Refresh", callback_data='3' + stock.sym),]
@@ -180,12 +180,17 @@ def buttoncallback(bot, update):
     if query.data.startswith('3'):
         symbol = query.data[1:]
         replyquote(symbol, update, chat_id=query.message.chat_id, message_id=query.message.message_id, bot=bot)
-    elif query.data.startswith('1'):
-        symbol=query.data[1:]
-        chatid=query.message.chat_id
-
-        addtowatchlist(symbol=symbol,bot=bot,update=update)
     elif query.data.startswith('2'):
+        symbol=query.data[1:]
+        [symbol,querysymbol]=symbol.split('#')
+        chatid=query.message.chat_id
+        db.createorupdateportfolio(sym=symbol,chatid=chatid,qty=0,state=db.PORTFOLIO_STATE_PENDING,querysymbol=querysymbol)
+        query.message.reply_text(
+            "Give the _price_ and _quantity_  you bought "+symbol+" for?```"
+            "\n\nUSAGE: +<qty><space><price> "
+"\ne.g. +1000  1104.25```",parse_mode=ParseMode.MARKDOWN)
+        # return PORTFOLIO_QUERY
+    elif query.data.startswith('1'):
         symbol=query.data[1:]
 
         addtowatchlist(symbol=symbol,bot=bot,update=update)
@@ -210,13 +215,6 @@ def ipo(bot, update):
         update.message.reply_text("Error", e)
         return nextconversation(update)
 
-def portfolio(bot, update):
-    try:
-        reply(text="Coming soon..", update=update, bot=bot, parsemode=ParseMode.HTML)
-        return nextconversation(update)
-    except Exception as e:
-        update.message.reply_text("Error", e)
-        return nextconversation(update)
 
 def error(bot, update, error):
     """Log Errors caused by Updates."""
@@ -238,7 +236,7 @@ def watchlist(bot, update):
     try:
         watchlist=db.getwatchlist(str(update.message.chat_id))
         syslist=[row.sym for row in watchlist]
-        names = [row.misc for row in watchlist]
+        names = [row.querysymbol for row in watchlist]
         displaytext = ''
         if len(watchlist)>0:
             # TODO the syslist will be the names here, so swapping it, change to make better
@@ -264,7 +262,35 @@ def watchlist(bot, update):
         update.message.reply_text("Error in watchlist")
     return nextconversation(update)
 
-
+def portfolio(bot, update):
+    try:
+        portfoliolist=db.getportfolio(str(update.message.chat_id))
+        syslist=[row.sym for row in portfoliolist]
+        names = [row.querysymbol for row in portfoliolist]
+        displaytext = ''
+        if len(portfoliolist)>0:
+            # TODO the syslist will be the names here, so swapping it, change to make better
+            stocklist=data.fetchquotelist(names,syslist)
+            totalprofit=0
+            for stock,portfolio in zip(stocklist,portfoliolist):
+                sym=portfolio.sym
+                addedprice=portfolio.callrange
+                ltp=stock.ltp
+                profit=(float(ltp)-float(addedprice))*float(portfolio.qty)
+                totalprofit+=profit
+                displaytext+="<b>"+sym+" @ "+ltp+"</b>"\
+                    +"<pre>"\
+                    +"\nPRICE   : "+addedprice+"  QTY : "+str(portfolio.qty)\
+                    +"\nPROFIT  : "+"{:.2f}".format(profit)\
+                    +"</pre>\n\n"
+        if not displaytext:
+            displaytext="Empty Portfolio"
+        else:
+            displaytext+="<b>Total Profit:  "+"{:.2f}".format(totalprofit)+"</b>"
+        reply(text=displaytext, update=update, bot=bot, parsemode=ParseMode.HTML)
+    except Exception as e:
+        update.message.reply_text("Error in portfolio")
+    return nextconversation(update)
 
 def watch(bot,update,user_data=None):
     try:
@@ -283,13 +309,31 @@ def watch(bot,update,user_data=None):
 
 def addtowatchlist(symbol,bot,update):
     stock = data.fetchquote(symbol)
-    # reusing the same calls db with type as watch and using the misc column for query symbol
+
     db.createcall(type=db.WATCH_TYPE, symbol=stock.sym, callrange=stock.ltp,
-                  misc=stock.querysymbol, user=update.effective_message.from_user.first_name, chatid=str(update.effective_message.chat_id),
+                  querysymbol=stock.querysymbol, user=update.effective_message.from_user.first_name, chatid=str(update.effective_message.chat_id),
                   userid=str(update.effective_message.from_user.id))
     reply(text="Added to watchlist\n" + str(stock), update=update, bot=bot, parsemode=ParseMode.HTML)
     db.deleteoldwatchlist()
 
+
+def addtoportfolio(bot,update):
+    try:
+        text=update.message.text
+        [qty,price]=text.split(' ')
+        call=db.lastupdatedportfolio(str(update.message.chat_id))
+        if call:
+            call=db.createorupdateportfolio(call.sym,db.PORTFOLIO_STATE_COMPLETE,update.message.chat_id,qty,call.querysymbol,price)
+
+            if call:
+                price=call.callrange
+                qty=call.qty
+            update.message.reply_text(call.sym+" added to portfolio at avg price: "+"{:.2f}".format(price)+" total qty: "+str(qty))
+        else:
+            update.message.reply_text('Symbol not found')
+    except Exception as e:
+        update.message.reply_text("Error adding to portfolio. Check syntax")
+    return nextconversation(update)
 
 def makecall(bot, update, user_data):
     try:
@@ -427,6 +471,10 @@ def alert(bot, update):
     db.createalert(symbol, operation, price, str(chat_id))
     return nextconversation(update)
 
+def createportfolio(bot,update,user_data=None):
+    update.message.reply_text("Success Portfolio added")
+    pass
+
 
 def processquery(bot, update, user_data=None):
     logger.info("Query: "+update.message.text)
@@ -472,12 +520,14 @@ def processquery(bot, update, user_data=None):
             return deletecall(symbol, update)
         elif text.startswith('ALERT'):
             return alert(bot, update)
+        elif text.startswith(('+','-')):
+            return addtoportfolio(bot,update)
         elif len(text) < 50:
             return quote(bot, update)
         else:
             reply(text="Not ready to handle this query", update=update, bot=bot)
     except:
-        logger.error("Error processing query",sys.exc_info()[0])
+        logger.error("Error processing query",str(sys.exc_info()[0]))
         reply(text="Error", update=update, bot=bot)
 
     return nextconversation(update)
@@ -502,7 +552,10 @@ def setupnewconvhandler():
                                    pass_user_data=True),
 
                     MessageHandler(Filters.command, processquery, pass_user_data=True)
-                    ]
+                    ],
+            PORTFOLIO_QUERY:[MessageHandler(Filters.text,
+                                   createportfolio,
+                                   pass_user_data=True)]
         },
 
         fallbacks=[RegexHandler('^Done$', done, pass_user_data=True)]

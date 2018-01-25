@@ -2,18 +2,21 @@ import datetime
 
 from bot.models import Calls,Alert,Events,db
 from bot.util import logger
-from peewee import reduce,operator
+from peewee import reduce, operator, DoesNotExist
 from tinydb import TinyDB,JSONStorage
 
 alertslist = list()
 WATCH_TYPE="WATCH"
+PORTFOLIO_TYPE="PORTFOLIO"
 LIMIT=10
+PORTFOLIO_STATE_PENDING=1
+PORTFOLIO_STATE_COMPLETE=2
 
 tdb=TinyDB('store.json',storage=JSONStorage)
 
 def deleteoldcalls():
-    calls=Calls.select(Calls.time).where(Calls.type!=WATCH_TYPE).order_by(Calls.time.desc()).limit(LIMIT)
-    Calls.delete().where((Calls.type!=WATCH_TYPE) & (Calls.time.not_in(calls))).execute()
+    calls=Calls.select(Calls.time).where((Calls.type.not_in([WATCH_TYPE,PORTFOLIO_TYPE]))).order_by(Calls.time.desc()).limit(LIMIT)
+    Calls.delete().where((Calls.type.not_in([WATCH_TYPE,PORTFOLIO_TYPE])) & (Calls.time.not_in(calls))).execute()
 
 
 def deleteoldwatchlist():
@@ -28,7 +31,7 @@ def deletealert(symbol, chatid, operation):
 
 def deletecall(symbol, userid, chatid):
     logger.info('Deleting call... '+ symbol)
-    rowcount = Calls.delete().where((Calls.sym==symbol) & (Calls.userid==userid) & (Calls.chatid==chatid)).execute()
+    rowcount = Calls.delete().where((Calls.sym==symbol)& (Calls.chatid==chatid)).execute()
     return rowcount
 
 #TODO this should be changed, obviously we cant stream multiple symbol to show alerts,
@@ -58,7 +61,7 @@ def createalert(symbol, operation, price, chat_id):
 
 def getcalls(chatid, symbol=None):
     clauses=[(Calls.chatid==chatid),
-             (Calls.type!=WATCH_TYPE)]
+             (Calls.type.not_in([WATCH_TYPE, PORTFOLIO_TYPE]))]
     if symbol:
         clauses.append((Calls.sym==symbol))
 
@@ -76,7 +79,20 @@ def getwatchlist(chatid):
         watchlist.append(call)
     return watchlist
 
+def getportfolio(chatid):
+    portfolio = list()
+    for call in Calls.select().where((Calls.chatid==chatid) & (Calls.type==PORTFOLIO_TYPE) & (Calls.qty > 0)):
+        portfolio.append(call)
+    return portfolio
 
+def lastupdatedportfolio(chatid):
+    try:
+        call=Calls.select()\
+                .where((Calls.chatid==chatid) & (Calls.type==PORTFOLIO_TYPE) & (Calls.misc==str(PORTFOLIO_STATE_PENDING)))\
+                .order_by(Calls.time.desc()).get()
+    except DoesNotExist as de:
+        pass
+    return call
 
 
 def createcall(type, symbol, user, chatid, userid,callrange=None, misc=None,desc=None):
@@ -94,7 +110,7 @@ def insertevents(events):
         # companies=events[date]
         for company in v:
             if company:
-                Events.insert(name=company,date=datetimeobj,type="RESULT").upsert().execute()
+                Events.insert(name=company,time=datetimeobj,type="RESULT").upsert().execute()
 
 
 def deleteevents():
@@ -103,7 +119,7 @@ def deleteevents():
 def getevents():
     nextthree = datetime.date.today() +datetime.timedelta(days=3)
     eventsmap={}
-    for event in Events.select().where((Events.date>= datetime.date.today()) & (Events.date<=nextthree)):
+    for event in Events.select().where((Events.time >= datetime.date.today()) & (Events.time <= nextthree)):
         date= event.date.strftime('%Y-%m-%d')
         events=eventsmap.get(date)
         if not events:
@@ -115,6 +131,38 @@ def getevents():
 def getipos():
     ipotable = tdb.table('ipos')
     return ipotable.all()
+
+def createorupdateportfolio(sym,state,chatid,qty,querysymbol,price=None):
+    call = getCall(sym,"PORTFOLIO",chatid)
+    if call:
+        oldprice = float(call.callrange) if call.callrange else '0'
+        oldqty = call.qty
+        qty = int(qty)
+        if price:
+            price=float(price)
+            newqty = qty+oldqty
+            newprice= (oldprice*oldqty+price*qty)/newqty
+            call.callrange="{:.2f}".format(newprice)
+            call.qty=newqty
+        call.time=datetime.datetime.now()
+        call.chatid=chatid
+        call.misc=str(state)
+        call.querysymbol=querysymbol
+        call.save()
+        return call
+    else:
+        Calls.insert(sym=sym,callrange=(str(price) if price else '0'),qty=int(qty),
+                     chatid=chatid,type=PORTFOLIO_TYPE,querysymbol=querysymbol,
+                     misc=str(state)).execute()
+
+
+
+def getCall(sym,type,chatid):
+    try:
+        call= Calls.get(Calls.sym==sym,Calls.type==type,Calls.chatid==chatid)
+        return call
+    except DoesNotExist as de:
+        logger.error("Not exists")
 
 def initdb():
     db.connect()

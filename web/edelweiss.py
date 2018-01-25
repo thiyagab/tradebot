@@ -54,14 +54,14 @@ def getevents():
     time=datetime.datetime.now()
     # if the market is closed, then get results for next day
     if time.hour>15 and time.minute>0:
-        time=time.replace(day=time.day+1)
+        time += datetime.timedelta(days=1)
 
     events={}
     for i in range(7):
         date=time.strftime('%Y-%m-%d')
         event=getevent(date)
         events[date]=event
-        time = time.replace(day=time.day + 1)
+        time += datetime.timedelta(days=1)
 
     return events
 

@@ -16,13 +16,18 @@ class BaseModel(Model):
 class Calls(BaseModel):
     sym=CharField()
     type=CharField()
-    callrange=CharField()
+    callrange=CharField(null=True)
     desc=CharField(null=True)
     user=CharField(null=True)
     chatid=CharField()
     userid=CharField(null=True)
     time=DateTimeField(default=datetime.datetime.now)
     misc=CharField(null=True)
+    querysymbol=CharField(null=True)
+    qty=IntegerField(null=True)
+
+
+
 
     # def updateorreplace(self):
     #     self.insert(self).upsert().execute()
@@ -47,7 +52,7 @@ class Alert(BaseModel):
 
 class Events(BaseModel):
     name=CharField()
-    date=DateTimeField()
+    time=DateTimeField()
     sym=CharField(null=True)
     type=CharField(null=True)
 
