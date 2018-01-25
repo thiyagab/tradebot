@@ -330,7 +330,7 @@ def addtoportfolio(bot,update):
             if call:
                 price=call.callrange
                 qty=call.qty
-            update.message.reply_text(call.sym+" added to portfolio at avg price: "+"{:.2f}".format(price)+" total qty: "+str(qty))
+            update.message.reply_text(call.sym+" added to portfolio at avg price: "+price+" total qty: "+str(qty))
         else:
             update.message.reply_text('Symbol not found')
     except Exception as e:
