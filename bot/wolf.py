@@ -39,7 +39,7 @@ logger = logging.getLogger(__name__)
 
 MAKECALL, SYMBOL, QUERY,PORTFOLIO_QUERY = range(4)
 INVALIDSYNTAX, INVALIDSYMBOL, GENERALERROR = range(3)
-VERSION = 'v0.0.6'
+VERSION = 'v0.0.8'
 
 HELPTXT = 'Wolf the Stock BOT(' + VERSION + ')\n\n' \
           + 'Current version supports \n' \
