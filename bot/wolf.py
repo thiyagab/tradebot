@@ -313,7 +313,7 @@ def addtowatchlist(symbol,bot,update):
         db.createcall(type=db.WATCH_TYPE, symbol=stock.sym, callrange=stock.ltp,
                       querysymbol=stock.querysymbol, user=update.effective_message.from_user.first_name, chatid=str(update.effective_message.chat_id),
                       userid=str(update.effective_message.from_user.id))
-        reply(text="Added to watchlist\n" + str(stock), update=update, bot=bot, parsemode=ParseMode.HTML)
+        reply(text="Added to watchlist\n" + stock.shortview(), update=update, bot=bot, parsemode=ParseMode.HTML)
         db.deleteoldwatchlist()
     except Exception as e:
         pass
@@ -479,58 +479,61 @@ def createportfolio(bot,update,user_data=None):
 
 
 def processquery(bot, update, user_data=None):
-    logger.info("Query: "+update.message.text)
-    text = update.message.text.upper()
-    try:
-        # query may contain commands again, so process the commands too
-        if text.startswith('/'):
-            # ppl may use /q alerts or /q infy in private chat itself, lets process same as in group
-            if text.startswith('/Q '):
-                text = text.partition(' ')[2]
+    delay=datetime.datetime.now()-update.message.date
+    # If the update received is delayed more than 5 mins, it may be due to server restart, so ignore the old queries
+    if delay.seconds <300:
+        logger.info("Query: "+update.message.text+' Date: '+str(delay))
+        text = update.message.text.upper()
+        try:
+            # query may contain commands again, so process the commands too
+            if text.startswith('/'):
+                # ppl may use /q alerts or /q infy in private chat itself, lets process same as in group
+                if text.startswith('/Q '):
+                    text = text.partition(' ')[2]
+                else:
+                    text = text[1:]
+            if text.startswith(('BUY', 'SELL', 'SHORT')):
+                return makecall(bot, update, user_data)
+            elif text.startswith('CALLS'):
+                return calls(bot, update)
+            elif text.startswith("HELP"):
+                return start(bot, update)
+            elif text=="START":
+                return start(bot, update)
+            elif text=="CANCEL":
+                return done(bot, update)
+            elif text == "RESULTS":
+                return results(bot, update)
+            elif text.startswith("WATCHLIST"):
+                return watchlist(bot,update)
+            elif text.startswith("WATCH"):
+                return watch(bot,update)
+            elif text=="IPO":
+                return ipo(bot, update)
+            elif text.startswith("PORTFOLIO"):
+                return portfolio(bot, update)
+            elif text == "Q":
+                return quote(bot, update)
+            elif text == "NEWS":
+                return news(bot, update)
+            elif text.startswith('ALERTS'):
+                return alerts(bot, update)
+            elif text.startswith('RESULT'):
+                return results(bot, update)
+            elif text.startswith('DELETE'):
+                symbol = text.partition(' ')[2]
+                return deletecall(symbol, update)
+            elif text.startswith('ALERT'):
+                return alert(bot, update)
+            elif text.startswith(('+','-')):
+                return addtoportfolio(bot,update)
+            elif len(text) < 50:
+                return quote(bot, update)
             else:
-                text = text[1:]
-        if text.startswith(('BUY', 'SELL', 'SHORT')):
-            return makecall(bot, update, user_data)
-        elif text.startswith('CALLS'):
-            return calls(bot, update)
-        elif text.startswith("HELP"):
-            return start(bot, update)
-        elif text=="START":
-            return start(bot, update)
-        elif text=="CANCEL":
-            return done(bot, update)
-        elif text == "RESULTS":
-            return results(bot, update)
-        elif text.startswith("WATCHLIST"):
-            return watchlist(bot,update)
-        elif text.startswith("WATCH"):
-            return watch(bot,update)
-        elif text=="IPO":
-            return ipo(bot, update)
-        elif text == "PORTFOLIO":
-            return portfolio(bot, update)
-        elif text == "Q":
-            return quote(bot, update)
-        elif text == "NEWS":
-            return news(bot, update)
-        elif text.startswith('ALERTS'):
-            return alerts(bot, update)
-        elif text.startswith('RESULT'):
-            return results(bot, update)
-        elif text.startswith('DELETE'):
-            symbol = text.partition(' ')[2]
-            return deletecall(symbol, update)
-        elif text.startswith('ALERT'):
-            return alert(bot, update)
-        elif text.startswith(('+','-')):
-            return addtoportfolio(bot,update)
-        elif len(text) < 50:
-            return quote(bot, update)
-        else:
-            reply(text="Not ready to handle this query", update=update, bot=bot)
-    except:
-        logger.error("Error processing query",str(sys.exc_info()[0]))
-        reply(text="Error", update=update, bot=bot)
+                reply(text="Not ready to handle this query", update=update, bot=bot)
+        except:
+            logger.error("Error processing query",str(sys.exc_info()[0]))
+            reply(text="Error", update=update, bot=bot)
 
     return nextconversation(update)
 

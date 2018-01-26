@@ -21,6 +21,9 @@ class Stock:
             str=''
         return str;
 
+    def shortview(self):
+        return '<b>'+self.sym.upper()+' @ '+self.ltp+ '</b>\n'
+
     def formatltt(self):
         return datetime.strptime(self.ltt,'%d/%m/%Y  %H:%M:%S').strftime('%b %d, %H:%M')
     def html(self):
