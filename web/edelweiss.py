@@ -8,6 +8,7 @@ from web.stock import Stock
 
 
 def getquote(sym):
+
     rsp = requests.post('https://ewmw.edelweiss.in/ewreports/api/search/gsa/suggestions',
                         {"SearchString": sym, "Cookie": ""})
     if rsp.status_code in (200,):
@@ -41,8 +42,8 @@ def getstreamingdata(querylist, names=None,symbols=None):
             sym=''
             if symbols:
                 sym=symbols[idx]
-            if not sym and quotejson['dpName']:
-                sym = quotejson['dpName']
+            if (not sym or sym.isnumeric()) and quotejson['dpName']:
+                sym = quotejson['dpName'].partition('-')[0]
             stock = Stock(sym=sym, name=name, ltp=quotejson['ltp'], h=quotejson['h'], l=quotejson['l'], o=quotejson['o'],
                           cp=quotejson['chgP'], c=quotejson['c'], ltt=quotejson['ltt'], querysymbol=quotejson['sym'])
             stocklist.append(stock)

@@ -75,7 +75,7 @@ def getcalls(chatid, symbol=None):
 
 def getwatchlist(chatid):
     watchlist = list()
-    for call in Calls.select().where((Calls.chatid==chatid) & (Calls.type==WATCH_TYPE)):
+    for call in Calls.select().where((Calls.chatid==chatid) & (Calls.type==WATCH_TYPE) & (Calls.sym.is_null(False))):
         watchlist.append(call)
     return watchlist
 

@@ -91,6 +91,9 @@ def start(bot, update):
 def quote(bot, update):
     try:
         text = update.message.text
+        if len(text)<3:
+            update.message.reply_text('Please give atleast three characters')
+            return nextconversation(update)
         if text.startswith("/q"):
             parttext = text.partition(' ')
             if parttext[2]:
@@ -249,11 +252,10 @@ def watchlist(bot, update):
                 hi=stock.h
                 low=stock.l
                 cp="{:.2f}".format(((float(ltp)-float(addedprice))/float(addedprice))*100)
-                displaytext+="<b>"+sym+"</b>"\
+                displaytext+="<b>"+sym+' @ '+ltp+"</b>"\
                     +"<pre>"\
-                    +"\nAT  : "+addedprice+"  LTP : "+ltp\
+                    +"AT  : "+addedprice+"  CP  : "+cp+"%"\
                     +"\nHI  : "+hi+"  LO  : "+low\
-                    +"\nCP  : "+cp+"%"\
                     +"</pre>\n\n"
         if not displaytext:
             displaytext="Empty watchlist"
@@ -310,13 +312,17 @@ def watch(bot,update,user_data=None):
 def addtowatchlist(symbol,bot,update):
     stock = data.fetchquote(symbol)
     try:
-        db.createcall(type=db.WATCH_TYPE, symbol=stock.sym, callrange=stock.ltp,
-                      querysymbol=stock.querysymbol, user=update.effective_message.from_user.first_name, chatid=str(update.effective_message.chat_id),
-                      userid=str(update.effective_message.from_user.id))
-        reply(text="Added to watchlist\n" + stock.shortview(), update=update, bot=bot, parsemode=ParseMode.HTML)
-        db.deleteoldwatchlist()
+        if len(stock.sym)>0:
+            db.createcall(type=db.WATCH_TYPE, symbol=stock.sym, callrange=stock.ltp,
+                          querysymbol=stock.querysymbol, user=update.effective_message.from_user.first_name, chatid=str(update.effective_message.chat_id),
+                          userid=str(update.effective_message.from_user.id))
+            reply(text="Added to watchlist\n" + stock.shortview(), update=update, bot=bot, parsemode=ParseMode.HTML)
+            db.deleteoldwatchlist()
+        else:
+            update.message.reply_text("Error adding to watchlist")
     except Exception as e:
-        pass
+        update.message.reply_text("Error adding to watchlist")
+
 
 
 def addtoportfolio(bot,update):
