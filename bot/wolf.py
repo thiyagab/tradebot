@@ -532,7 +532,7 @@ def processquery(bot, update, user_data=None):
                 return start(bot, update)
             elif text=="START":
                 return start(bot, update)
-            elif text=="CANCEL":
+            elif text.startswith("CANCEL"):
                 return done(bot, update)
             elif text == "RESULTS":
                 return results(bot, update)
