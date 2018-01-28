@@ -34,6 +34,17 @@ def deletecall(symbol, userid, chatid):
     rowcount = Calls.delete().where((Calls.sym==symbol)& (Calls.chatid==chatid)).execute()
     return rowcount
 
+def deletewatchlist(symbol, chatid):
+    logger.info('Deleting watchlist... '+ symbol)
+    rowcount = Calls.delete().where((Calls.sym==symbol)& (Calls.chatid==chatid) & (Calls.type==WATCH_TYPE)).execute()
+    return rowcount
+def deleteportfolio(symbol, chatid):
+    logger.info('Deleting portfolio... '+ symbol)
+    rowcount = Calls.delete().where((Calls.sym==symbol)& (Calls.chatid==chatid) & (Calls.type==PORTFOLIO_TYPE)).execute()
+    return rowcount
+
+
+
 #TODO this should be changed, obviously we cant stream multiple symbol to show alerts,
 #but still keeping the alerts in list is not efficient
 def updatealerts():
@@ -91,7 +102,7 @@ def lastupdatedportfolio(chatid):
                 .where((Calls.chatid==chatid) & (Calls.type==PORTFOLIO_TYPE) & (Calls.misc==str(PORTFOLIO_STATE_PENDING)))\
                 .order_by(Calls.time.desc()).get()
     except DoesNotExist as de:
-        pass
+        return None
     return call
 
 
@@ -156,6 +167,14 @@ def createorupdateportfolio(sym,state,chatid,qty,querysymbol,price=None):
                      misc=str(state)).execute()
 
 
+def deletependingportfolio(chatid):
+    Calls.delete().where((Calls.chatid==str(chatid)) & (Calls.qty==0)).execute()
+
+
+
+def insertpendingportfolio(symbol,chatid,querysymbol):
+    deletependingportfolio(chatid)
+    createorupdateportfolio(sym=symbol, chatid=chatid, qty=0, state=PORTFOLIO_STATE_PENDING, querysymbol=querysymbol)
 
 def getCall(sym,type,chatid):
     try:

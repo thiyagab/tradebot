@@ -37,7 +37,7 @@ logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s
 
 logger = logging.getLogger(__name__)
 
-MAKECALL, SYMBOL, QUERY,PORTFOLIO_QUERY = range(4)
+MAKECALL, SYMBOL, QUERY,PORTFOLIO_DEL_QUERY,WATCHLIST_DEL_QUERY = range(5)
 INVALIDSYNTAX, INVALIDSYMBOL, GENERALERROR = range(3)
 VERSION = 'v0.0.8'
 
@@ -92,7 +92,7 @@ def quote(bot, update):
     try:
         text = update.message.text
         if len(text)<3:
-            update.message.reply_text('Please give atleast three characters')
+            update.message.reply_text('Please give atleast three characters. Try again /quote')
             return nextconversation(update)
         if text.startswith("/q"):
             parttext = text.partition(' ')
@@ -187,7 +187,7 @@ def buttoncallback(bot, update):
         symbol=query.data[1:]
         [symbol,querysymbol]=symbol.split('#')
         chatid=query.message.chat_id
-        db.createorupdateportfolio(sym=symbol,chatid=chatid,qty=0,state=db.PORTFOLIO_STATE_PENDING,querysymbol=querysymbol)
+        db.insertpendingportfolio(symbol=symbol,chatid=chatid,querysymbol=querysymbol)
         query.message.reply_text(
             "Give the _price_ and _quantity_  you bought "+symbol+" for?```"
             "\n\nUSAGE: +<qty><space><price> "
@@ -254,7 +254,7 @@ def watchlist(bot, update):
                 cp="{:.2f}".format(((float(ltp)-float(addedprice))/float(addedprice))*100)
                 displaytext+="<b>"+sym+' @ '+ltp+"</b>"\
                     +"<pre>"\
-                    +"AT  : "+addedprice+"  CP  : "+cp+"%"\
+                    +"\nAT  : "+addedprice+"  CP  : "+cp+"%"\
                     +"\nHI  : "+hi+"  LO  : "+low\
                     +"</pre>\n\n"
         if not displaytext:
@@ -337,8 +337,8 @@ def addtoportfolio(bot,update):
                 price=call.callrange
                 qty=call.qty
             update.message.reply_text(call.sym+" added to portfolio at avg price: "+price+" total qty: "+str(qty))
-        else:
-            update.message.reply_text('Symbol not found')
+        #else:
+            #update.message.reply_text('Nothing to add')
     except Exception as e:
         update.message.reply_text("Error adding to portfolio. Check syntax")
     return nextconversation(update)
@@ -413,6 +413,26 @@ def deletecall(symbol, update):
         update.message.reply_text("No calls for symbol " + symbol)
 
 
+def deletewatchlist(bot, update,user_data=None):
+    chatid = update.message.chat_id
+    symbol = update.message.text.upper()
+    rowcount = db.deletewatchlist(symbol, chatid)
+    if rowcount > 0:
+        update.message.reply_text(symbol + " removed from watchlist")
+    else:
+        update.message.reply_text(symbol+" not in watchlist")
+    return nextconversation(update)
+
+def deleteportfolio(bot, update,user_data=None):
+    chatid = update.message.chat_id
+    symbol = update.message.text.upper()
+    rowcount = db.deleteportfolio(symbol, chatid)
+    if rowcount > 0:
+        update.message.reply_text(symbol + " removed from portfolio")
+    else:
+        update.message.reply_text(symbol+" not in portfolio")
+    return nextconversation(update)
+
 def results(bot,update):
     replytxt=''
     eventsmap=db.getevents()
@@ -479,10 +499,16 @@ def alert(bot, update):
     db.createalert(symbol, operation, price, str(chat_id))
     return nextconversation(update)
 
-def createportfolio(bot,update,user_data=None):
-    update.message.reply_text("Success Portfolio added")
-    pass
+def delportfolioquery(bot,update):
+    isadmin=reply(text="Give the symbol to delete from portfolio?",bot=bot,update=update)
+    if not isgroup(update) or isadmin:
+        return PORTFOLIO_DEL_QUERY
 
+
+def delwatchlistquery(bot, update):
+    isadmin = reply(text="Give the symbol to delete from watchlist?", bot=bot, update=update)
+    if not isgroup(update) or isadmin:
+        return WATCHLIST_DEL_QUERY
 
 def processquery(bot, update, user_data=None):
     delay=datetime.datetime.now()-update.message.date
@@ -533,6 +559,10 @@ def processquery(bot, update, user_data=None):
                 return alert(bot, update)
             elif text.startswith(('+','-')):
                 return addtoportfolio(bot,update)
+            elif text.startswith('DELPORTFOLIO'):
+                return delportfolioquery(bot, update)
+            elif text.startswith('DELWATCHLIST'):
+                return delwatchlistquery(bot,update)
             elif len(text) < 50:
                 return quote(bot, update)
             else:
@@ -555,7 +585,9 @@ def setupnewconvhandler():
                       CommandHandler('calls', processquery),
                       CommandHandler('results', processquery),
                       CommandHandler('news', processquery),
-                      CommandHandler('cancel', processquery)],
+                      CommandHandler('cancel', processquery),
+                      CommandHandler('delwatchlist', processquery),
+                      CommandHandler('delportfolio', processquery)],
 
         states={
             QUERY: [MessageHandler(Filters.text,
@@ -564,9 +596,13 @@ def setupnewconvhandler():
 
                     MessageHandler(Filters.command, processquery, pass_user_data=True)
                     ],
-            PORTFOLIO_QUERY:[MessageHandler(Filters.text,
-                                   createportfolio,
-                                   pass_user_data=True)]
+            WATCHLIST_DEL_QUERY: [MessageHandler(Filters.text,
+                                   deletewatchlist,
+                                   pass_user_data=True)],
+            PORTFOLIO_DEL_QUERY: [MessageHandler(Filters.text,
+                                   deleteportfolio,
+                                   pass_user_data=True)],
+
         },
 
         fallbacks=[RegexHandler('^Done$', done, pass_user_data=True)]
@@ -622,6 +658,15 @@ def newmember(bot, update):
         print(member.name)
         bot.send_message(chat_id=member.id, text="Hi "+member.name+",\nWelcome to our group")
 
+
+# This method should not be processed for private chat
+# as it is already handled in processquery
+def createportfolio(bot,update):
+    if(isgroup(update)):
+        addtoportfolio(bot,update)
+
+
+
 def main():
 
     db.initdb()
@@ -650,6 +695,8 @@ def main():
 
     dp.add_handler(CallbackQueryHandler(buttoncallback))
     dp.add_handler(MessageHandler(Filters.status_update.new_chat_members, newmember))
+    dp.add_handler(RegexHandler('^[\+|\-][0-9.]+ [0-9.]+',
+                                    createportfolio))
 
     # on noncommand i.e message - echo the message on Telegram
     # dp.add_handler(MessageHandler(Filters.text, echo))
