@@ -189,9 +189,10 @@ def buttoncallback(bot, update):
         chatid=query.message.chat_id
         db.insertpendingportfolio(symbol=symbol,chatid=chatid,querysymbol=querysymbol)
         query.message.reply_text(
-            "Give the _price_ and _quantity_  you bought "+symbol+" for?```"
-            "\n\nUSAGE: +<qty><space><price> "
-"\ne.g. +1000  1104.25```",parse_mode=ParseMode.MARKDOWN)
+            "Give the *price* and *quantity*  you bought "+symbol+" for?\n"+
+"```\n\nSYNTAX:\nTo add +<qty><space><price> "
+"\ne.g. +1000  1104.25"
+"\n\nTo remove -<qty>\ne.g. -100\n(Note: Realised profit is not supported yet.So no need for price while removing)```",parse_mode=ParseMode.MARKDOWN)
         # return PORTFOLIO_QUERY
     elif query.data.startswith('1'):
         symbol=query.data[1:]
@@ -289,21 +290,21 @@ def portfolio(bot, update):
                 totalvalue+=current
                 displaytext+="<b>"+sym+" @ "+ltp+" CMP</b>"\
                     +"<pre>"\
-                    +"\nBOUGHT             : "+addedprice\
-                    +"\nQTY                : "+str(portfolio.qty) \
-                    +"\nINVESTED           : "+"{:.2f}".format(invested) \
-                    +"\nCURRENT            : "+"{:.2f}".format(current) \
-                    +"\nUNREALIZED PROFIT  : "+"{:.2f}".format(profit) \
-                    +"\nUNREALIZED PROFIT% : "+"{:.2f}".format(profitpercent)+"%" \
+                    +"\nBOUGHT      : "+addedprice\
+                    +"\nQTY         : "+str(portfolio.qty) \
+                    +"\nINVESTED    : "+"{:.2f}".format(invested) \
+                    +"\nCURRENT     : "+"{:.2f}".format(current) \
+                    +"\nPROFIT      : "+"{:.2f}".format(profit) \
+                    +"\nPROFIT%     : "+"{:.2f}".format(profitpercent)+"%" \
                     +"</pre>\n\n"
         if not displaytext:
             displaytext="Empty Portfolio"
         else:
             displaytext="<pre>" \
-                         +"Total Invested :   "+"{:.2f}".format(totalinvested) \
-                         +"\nTotal Value    :   "+"{:.2f}".format(totalvalue) \
-                         +"\nTotal Profit   :   "+"{:.2f}".format(totalprofit) \
-                         +"\nTotal Profit%  :   "+"{:.2f}".format((totalprofit/totalinvested)*100)+'%' \
+                         +"Total Invested :  "+"{:.2f}".format(totalinvested) \
+                         +"\nTotal Value    :  "+"{:.2f}".format(totalvalue) \
+                         +"\nTotal Profit   :  "+"{:.2f}".format(totalprofit) \
+                         +"\nTotal Profit%  :  "+"{:.2f}".format((totalprofit/totalinvested)*100)+'%' \
                          +"\n\n</pre>"+displaytext
         reply(text=displaytext, update=update, bot=bot, parsemode=ParseMode.HTML)
     except Exception as e:
@@ -711,7 +712,7 @@ def main():
 
     # updater = Updater("535372141:AAEgx8VtahWGWWUYhFcYR0zonqIHycRMXi0")  #Dev
 
-    updater = Updater(config['telegram'][token_key])  # Live
+    updater = Updater(config['telegram'][token_key],workers=10)  # Live
 
     # Get the dispatcher to register handlers
     dp = updater.dispatcher
