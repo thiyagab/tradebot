@@ -69,7 +69,7 @@ def reply(text,bot=None,update=None,parsemode=None,chatid=None,reply_markup=None
                          parse_mode=parsemode,
                          reply_markup=reply_markup,
                          disable_web_page_preview=disable_web_page_preview)
-        update.effective_message.reply_text("Lets not spam the group, I replied you in private chat @btstockbot")
+        update.effective_message.reply_text("Unauthorized! Please check with your admin. I replied you in private chat @btstockbot")
     elif update:
         update.effective_message.reply_text(text,
                                   parse_mode=parsemode,
@@ -82,7 +82,7 @@ def reply(text,bot=None,update=None,parsemode=None,chatid=None,reply_markup=None
 def start(bot, update):
     """Send a message when the command /start is issued."""
     isadmin=reply(HELPTXT,bot=bot,update=update)
-    if not isgroup(update) or isadmin:
+    if not isgroup(update):
         return QUERY
     else:
         return ConversationHandler.END
@@ -274,21 +274,37 @@ def portfolio(bot, update):
             # TODO the syslist will be the names here, so swapping it, change to make better
             stocklist=data.fetchquotelist(names,syslist)
             totalprofit=0
+            totalinvested=0
+            totalvalue=0
             for stock,portfolio in zip(stocklist,portfoliolist):
                 sym=portfolio.sym
                 addedprice=portfolio.callrange
                 ltp=stock.ltp
+                invested=float(addedprice)*float(portfolio.qty)
+                current=float(ltp)*float(portfolio.qty)
                 profit=(float(ltp)-float(addedprice))*float(portfolio.qty)
+                profitpercent=(profit/invested)*100
                 totalprofit+=profit
-                displaytext+="<b>"+sym+" @ "+ltp+"</b>"\
+                totalinvested+=invested
+                totalvalue+=current
+                displaytext+="<b>"+sym+" @ "+ltp+" CMP</b>"\
                     +"<pre>"\
-                    +"\nPRICE   : "+addedprice+"  QTY : "+str(portfolio.qty)\
-                    +"\nPROFIT  : "+"{:.2f}".format(profit)\
+                    +"\nBOUGHT             : "+addedprice\
+                    +"\nQTY                : "+str(portfolio.qty) \
+                    +"\nINVESTED           : "+"{:.2f}".format(invested) \
+                    +"\nCURRENT            : "+"{:.2f}".format(current) \
+                    +"\nUNREALIZED PROFIT  : "+"{:.2f}".format(profit) \
+                    +"\nUNREALIZED PROFIT% : "+"{:.2f}".format(profitpercent)+"%" \
                     +"</pre>\n\n"
         if not displaytext:
             displaytext="Empty Portfolio"
         else:
-            displaytext+="<b>Total Profit:  "+"{:.2f}".format(totalprofit)+"</b>"
+            displaytext="<pre>" \
+                         +"Total Invested :   "+"{:.2f}".format(totalinvested) \
+                         +"\nTotal Value    :   "+"{:.2f}".format(totalvalue) \
+                         +"\nTotal Profit   :   "+"{:.2f}".format(totalprofit) \
+                         +"\nTotal Profit%  :   "+"{:.2f}".format((totalprofit/totalinvested)*100)+'%' \
+                         +"\n\n</pre>"+displaytext
         reply(text=displaytext, update=update, bot=bot, parsemode=ParseMode.HTML)
     except Exception as e:
         update.message.reply_text("Error in portfolio")
@@ -327,18 +343,27 @@ def addtowatchlist(symbol,bot,update):
 
 def addtoportfolio(bot,update):
     try:
-        text=update.message.text
-        [qty,price]=text.split(' ')
+        text=update.message.text.strip()
+        qty=price=0
+        if(text.startswith('-')):
+            qty = int(text)
+        else:
+            [qty,price]=text.split(' ')
         call=db.lastupdatedportfolio(str(update.message.chat_id))
+
         if call:
+            if call.qty==0 and price==0:
+                raise ValueError('Nothing in portfolio to sell for '+call.sym)
             call=db.createorupdateportfolio(call.sym,db.PORTFOLIO_STATE_COMPLETE,update.message.chat_id,qty,call.querysymbol,price)
 
             if call:
                 price=call.callrange
                 qty=call.qty
-            update.message.reply_text(call.sym+" added to portfolio at avg price: "+price+" total qty: "+str(qty))
+            update.message.reply_text(call.sym+" updated in portfolio at avg price: "+price+" total qty: "+str(qty))
         #else:
             #update.message.reply_text('Nothing to add')
+    except ValueError as ve:
+        update.message.reply_text("Error: "+ve.args[0])
     except Exception as e:
         update.message.reply_text("Error adding to portfolio. Check syntax")
     return nextconversation(update)

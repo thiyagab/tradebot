@@ -149,10 +149,10 @@ def createorupdateportfolio(sym,state,chatid,qty,querysymbol,price=None):
         oldprice = float(call.callrange) if call.callrange else '0'
         oldqty = call.qty
         qty = int(qty)
-        if price:
+        if price is not None:
             price=float(price)
             newqty = qty+oldqty
-            newprice= (oldprice*oldqty+price*qty)/newqty
+            newprice= (oldprice*oldqty+price*qty)/newqty if price!=0 else oldprice
             call.callrange="{:.2f}".format(newprice)
             call.qty=newqty
         call.time=datetime.datetime.now()
