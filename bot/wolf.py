@@ -21,6 +21,8 @@ import logging
 import sys
 
 import datetime
+
+
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, ChatMember
 from telegram import ParseMode, Chat
 from telegram.ext import (Updater, CommandHandler, MessageHandler, Filters, RegexHandler,
@@ -32,6 +34,8 @@ from alerts.twitter import fromtwitter
 from alerts.rss import reader
 
 # Enable logging
+
+
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
                     level=logging.INFO)
 
@@ -60,8 +64,7 @@ errormsgs = {INVALIDSYNTAX: "Usage: BUY|SELL 'symbol'@'pricerange' SL@'pricerang
 
 
 def reply(text,bot=None,update=None,parsemode=None,chatid=None,reply_markup=None,disable_web_page_preview=None):
-
-    isgroupadmin=isadmin(bot,chat_id=update.effective_message.chat_id,user_id=update.effective_message.from_user.id)
+    isgroupadmin=isgroup(update) and isadmin(bot,chat_id=update.effective_message.chat_id,user_id=update.effective_message.from_user.id)
     if bot and isgroup(update) and not isgroupadmin:
         if not chatid:
             chatid=update.effective_message.from_user.id
@@ -86,7 +89,6 @@ def start(bot, update):
         return QUERY
     else:
         return ConversationHandler.END
-
 
 def quote(bot, update):
     try:
@@ -126,6 +128,7 @@ def nextconversation(update):
 def isgroup(update):
     type = update.effective_chat.type
     return (type == Chat.GROUP or type == Chat.SUPERGROUP)
+
 
 def isadmin(bot,chat_id,user_id):
     status=bot.get_chat_member(chat_id, user_id).status
@@ -535,6 +538,9 @@ def delwatchlistquery(bot, update):
     isadmin = reply(text="Give the symbol to delete from watchlist?", bot=bot, update=update)
     if not isgroup(update) or isadmin:
         return WATCHLIST_DEL_QUERY
+
+
+
 
 def processquery(bot, update, user_data=None):
     delay=datetime.datetime.now()-update.message.date

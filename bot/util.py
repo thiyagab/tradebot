@@ -3,10 +3,28 @@ import re
 import logging
 
 # Enable logging
+import datetime
+
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
                     level=logging.INFO)
 
 logger = logging.getLogger(__name__)
+
+
+def timeit(method):
+
+    def timed(*args, **kw):
+        ts = datetime.datetime.now()
+        result = method(*args, **kw)
+        te = datetime.datetime.now()
+
+
+
+        print('%r  %2.2f ms' % \
+              (method.__name__, (te-ts).microseconds))
+        return result
+
+    return timed
 
 def with_touched_chat(f):
     @wraps(f)
